@@ -16,7 +16,7 @@ bibliography: ref.bib
 library(BiocStyle)
 library(knitr)
 opts_chunk$set(error=FALSE)
-biocbuild <- FALSE
+biocbuild <- TRUE
 ```
 
 # Introduction
