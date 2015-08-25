@@ -878,16 +878,29 @@ unlink(temp.file)
 Some mapping statistics can be reported as previously described.
 For brevity, the code will not be shown here, as it is identical to that used for the H3K9ac analysis.
 
-```{r, echo=FALSE, results="hide", eval=TRUE}
+```{r, echo=FALSE, results="hide", eval=TRUE, message=FALSE}
 bam.files <- paste0(sra.numbers, ".bam")
 for (bam in bam.files) {
     bam.url <- paste0(core.loc, bam)
-    download.file(bam.url, bam, quiet=TRUE)
-    download.file(paste0(bam.url, ".bai"), paste0(bam, ".bai"), quiet=TRUE)
+    download.file(bam.url, bam)
+    download.file(paste0(bam.url, ".bai"), paste0(bam, ".bai"))
 }
 ```
 
-```{r, ref.label="mapstat", echo=FALSE}
+```{r, echo=FALSE}
+diagnostics <- list()
+for (bam in bam.files) {
+    total <- countBam(bam)$records
+    mapped <- countBam(bam, param=ScanBamParam(
+        flag=scanBamFlag(isUnmapped=FALSE)))$records
+    marked <- countBam(bam, param=ScanBamParam(
+        flag=scanBamFlag(isUnmapped=FALSE, isDuplicate=TRUE)))$records
+    diagnostics[[bam]] <- c(Total=total, Mapped=mapped, Marked=marked)
+}
+diag.stats <- data.frame(do.call(rbind, diagnostics))
+diag.stats$Prop.mapped <- diag.stats$Mapped/diag.stats$Total*100
+diag.stats$Prop.marked <- diag.stats$Marked/diag.stats$Mapped*100
+diag.stats
 ```
 
 ## Detecting DB between genotypes for CBP 
