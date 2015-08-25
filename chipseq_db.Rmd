@@ -12,11 +12,16 @@ output:
 bibliography: ref.bib
 ---
 
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{ChIP-seq workflow to detect differential binding}
+-->
+
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
 opts_chunk$set(error=FALSE)
-biocbuild <- TRUE
+biocbuild <- TRUE # BioC build starts from BAM files, not SRA.
 ```
 
 # Introduction
@@ -76,7 +81,7 @@ data.frame(SRA=all.sra, Condition=grouping)
 These files are downloaded in the SRA format, and need to be unpacked to the FASTQ format prior to alignment.
 This can be done using the `fastq-dump` utility from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software).
 
-```{r, eval=FALSE}
+```{r, eval=!biocbuild}
 for (sra in all.sra) {
     code <- system(paste("fastq-dump", sra))
     stopifnot(code==0L)
@@ -87,7 +92,7 @@ all.fastq <- paste0(sra.numbers, ".fastq")
 Technical replicates are merged together prior to further processing. 
 This reflects the fact that they originate from a single library of DNA fragments.
 
-```{r, eval=FALSE}
+```{r, eval=!biocbuild}
 by.group <- split(all.fastq, grouping)
 for (group in names(by.group)) {
     code <- system(paste(c("cat", by.group[[group]], ">",
@@ -101,7 +106,7 @@ Reads in each library are aligned to the mm10 build of the mouse genome, using t
 This assumes that an index has already been constructed with the prefix `index/mm10`.
 Here, a consensus threshold of 2 is used instead of the default of 3, to accommodate the shorter length of the reads (32 bp).
 
-```{r, results="hide", eval=FALSE, message=FALSE}
+```{r, results="hide", eval=!biocbuild, message=FALSE}
 library(Rsubread)
 bam.files <- paste0(names(by.group), ".bam")
 align(index="index/mm10", readfile1=group.fastq, TH1=2, 
@@ -112,7 +117,7 @@ In each of the resulting BAM files, alignments are re-sorted by their mapping lo
 This is required for input into `r Biocpkg("csaw")`, 
     but is also useful for other programs like genome browsers that depend on sorting and indexing for rapid retrieval of reads.
 
-```{r, message=FALSE, results="hide", eval=FALSE}
+```{r, message=FALSE, results="hide", eval=!biocbuild}
 library(Rsamtools)
 for (bam in bam.files) {
     out <- suppressWarnings(sortBam(bam, "h3k9ac_temp"))
@@ -123,7 +128,7 @@ for (bam in bam.files) {
 Potential PCR duplicates are marked using the `MarkDuplicates` tool from the [Picard software suite](http://broadinstitute.github.io/picard).
 These are identified as alignments at the same genomic location, such that they may have originated from PCR-amplified copies of the same DNA fragment.
 
-```{r, eval=FALSE}
+```{r, eval=!biocbuild}
 temp.bam <- "h3k9ac_temp.bam"
 temp.file <- "h3k9ac_metric.txt"
 temp.dir <- "h3k9ac_working"
@@ -141,16 +146,16 @@ for (bam in bam.files) {
 The behaviour of the alignment pipeline for this data set can be easily summarized with some statistics.
 Ideally, the proportion of mapped reads should be high, while the proportion of marked reads should be low.
 
-```{r, eval=TRUE, results="hide", echo=FALSE, message=FALSE}
-library(Rsamtools)
+```{r, eval=biocbuild, results="hide", echo=FALSE, message=FALSE}
 library(Rsubread)
+library(Rsamtools)
 by.group <- split(all.sra, grouping)
 bam.files <- paste0(names(by.group), ".bam")
 core.loc <- "http://s3.amazonaws.com/chipseqdb-bamfiles/"
 for (bam in bam.files) { # Downloading all files.
     bam.url <- paste0(core.loc, bam)
-    download.file(bam.url, bam, quiet=TRUE)
-    download.file(paste0(bam.url, ".bai"), paste0(bam, ".bai"), quiet=TRUE)
+    download.file(bam.url, bam)
+    download.file(paste0(bam.url, ".bai"), paste0(bam, ".bai"))
 }
 ```
 
@@ -173,11 +178,11 @@ diag.stats
 Finally, the libraries are indexed for rapid retrieval by genomic location.
 This generates a number of index files at the same location as the BAM files.
 
-```{r, eval=FALSE, results = 'hide'}
+```{r, eval=!biocbuild, results = 'hide'}
 indexBam(bam.files)
 ```
 
-```{r, echo = FALSE, results = 'hide', eval=FALSE}
+```{r, echo = FALSE, results = 'hide', eval=!biocbuild}
 # Cleaning up
 unlink(all.fastq)
 unlink(group.fastq)
@@ -205,11 +210,11 @@ The chain file specifies the corresponding coordinates between the two builds an
     [here](http://hgdownload-test.cse.ucsc.edu/goldenPath/mm9/liftOver/mm9ToMm10.over.chain.gz).
 The new blacklist coordinates are then saved to file for future use.
 
-```{r, eval=TRUE, message=FALSE, echo=FALSE, results="hide"}
+```{r, eval=biocbuild, message=FALSE, echo=FALSE, results="hide"}
 chain.file <- "mm9ToMm10.over.chain"
-download.file(paste0(core.loc, chain.file), chain.file, quiet=TRUE)
+download.file(paste0(core.loc, chain.file), chain.file)
 bed.file <- "mm9-blacklist.bed"
-download.file(paste0(core.loc, bed.file), bed.file, quiet=TRUE)
+download.file(paste0(core.loc, bed.file), bed.file)
 ```
 
 ```{r, message=FALSE}
@@ -800,7 +805,7 @@ Optimal detection of all features can be obtained by performing analyses with mu
 In general, smaller window sizes are preferred as strong DB events with sufficient coverage will always be detected.
 For larger windows, detection may be confounded by other events within the window that distort the log-fold change in the counts between conditions.
 
-```{r, eval=TRUE, echo=FALSE, results="hide"}
+```{r, eval=biocbuild, echo=FALSE, results="hide"}
 unlink(bam.files)
 unlink(paste0(bam.files, ".bai"))
 ```
@@ -829,7 +834,7 @@ data.frame(SRA=all.sra, Condition=genotype)
 
 SRA files are unpacked to yield FASTQ files with the raw read sequences.
 
-```{r, eval=FALSE}
+```{r, eval=!biocbuild}
 for (sra in all.sra) { 
     code <- system(paste("fastq-dump", sra))
     stopifnot(code==0L)
@@ -841,7 +846,7 @@ Reads are aligned to the mm10 genome using `r Biocpkg("Rsubread")`.
 Here, the default consensus threshold is used as the reads are longer (75 bp).
 A Phred offset of +64 is also used, instead of the default +33 used in the previous analysis.
 
-```{r, eval=FALSE, message=FALSE, results="hide"}
+```{r, eval=!biocbuild, message=FALSE, results="hide"}
 bam.files <- paste0(sra.numbers, ".bam")
 align(index="index/mm10", readfile1=all.fastq, phredOffset=64, 
     input_format="FASTQ", output_file=bam.files)
@@ -850,7 +855,7 @@ align(index="index/mm10", readfile1=all.fastq, phredOffset=64,
 Alignments in each BAM file are sorted by coordinate.
 Duplicate reads are marked, and the resulting files are indexed.
 
-```{r, eval=FALSE, results="hide"}
+```{r, eval=!biocbuild, results="hide"}
 temp.bam <- "cbp_temp.bam"
 temp.file <- "cbp_metric.txt"
 temp.dir <- "cbp_working"
@@ -868,7 +873,7 @@ for (bam in bam.files) {
 indexBam(bam.files)
 ```
 
-```{r, eval=FALSE, echo = FALSE, results = 'hide'}
+```{r, eval=!biocbuild, echo = FALSE, results = 'hide'}
 # Cleaning up
 unlink(all.fastq)
 unlink(temp.dir, recursive=TRUE)
@@ -878,7 +883,7 @@ unlink(temp.file)
 Some mapping statistics can be reported as previously described.
 For brevity, the code will not be shown here, as it is identical to that used for the H3K9ac analysis.
 
-```{r, echo=FALSE, results="hide", eval=TRUE, message=FALSE}
+```{r, echo=FALSE, results="hide", eval=biocbuild}
 bam.files <- paste0(sra.numbers, ".bam")
 for (bam in bam.files) {
     bam.url <- paste0(core.loc, bam)
@@ -887,20 +892,7 @@ for (bam in bam.files) {
 }
 ```
 
-```{r, echo=FALSE}
-diagnostics <- list()
-for (bam in bam.files) {
-    total <- countBam(bam)$records
-    mapped <- countBam(bam, param=ScanBamParam(
-        flag=scanBamFlag(isUnmapped=FALSE)))$records
-    marked <- countBam(bam, param=ScanBamParam(
-        flag=scanBamFlag(isUnmapped=FALSE, isDuplicate=TRUE)))$records
-    diagnostics[[bam]] <- c(Total=total, Mapped=mapped, Marked=marked)
-}
-diag.stats <- data.frame(do.call(rbind, diagnostics))
-diag.stats$Prop.mapped <- diag.stats$Mapped/diag.stats$Total*100
-diag.stats$Prop.marked <- diag.stats$Marked/diag.stats$Mapped*100
-diag.stats
+```{r, ref.label="mapstat", echo=FALSE}
 ```
 
 ## Detecting DB between genotypes for CBP 
@@ -1098,7 +1090,7 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
 
 Note that that the `gax` and `greg` objects are the same as those used in the visualization of the H3k9ac data.
 
-```{r, eval=TRUE, echo=FALSE, results="hide"}
+```{r, eval=biocbuild, echo=FALSE, results="hide"}
 unlink(bam.files)
 unlink(paste0(bam.files, ".bai"))
 ```
