@@ -43,24 +43,31 @@ Peak-based methods are implemented in the `r Biocpkg("DiffBind")` and `r Biocpkg
     which count reads into peak intervals that have been identified with software like MACS [@zhang2008macs].
 This requires some care to maintain statistical rigour, as peaks are called with the same data used to test for DB.
 Alternatively, window-based approaches count reads into sliding windows across the genome.
-This is a more direct approach that avoids problems with data re-use and can provide increased DB detection power [@lun2014denovo].
+This is a more direct strategy that avoids problems with data re-use and can provide increased DB detection power [@lun2014denovo].
+However, its correct implementation is not straightforward due to the subtleties with interpretation of the false dicovery rate (FDR).
 
-This article describes a workflow for performing a window-based DB analysis, 
-    based primarily on software packages from the open-source Bioconductor project [@huber2015orchestrating].
+This article describes a computational workflow for performing a DB analysis with sliding windows.
+The aim is to facilitate the practical implementation of window-based DB analyses, by providing detailed code and expected output.
+The workflow described here applies to any ChIP-seq experiment with multiple experimental conditions and with multiple biological samples within one or more of the conditions.  
+It detects and summarizes DB regions between conditions in a *de novo* manner, i.e., without making any prior assumptions about the location or width of bound regions.  
+Detected regions are then annotated according to their proximity to annotated genes.  
+In addition, the code can be easily adapted to accommodate batch effects, covariates and multiple experimental factors.
+
+The workflow is based primarily on software packages from the open-source Bioconductor project [@huber2015orchestrating].
 It contains all steps that are necessary for detecting DB regions, starting from the raw read sequences.
 Reads are first aligned to the genome using the `r Biocpkg("Rsubread")` package [@liao2013subread].
 These are counted into sliding windows with `r Biocpkg("csaw")`, to quantify binding intensity across the genome [@lun2014denovo].
 Statistical modelling is based on the negative binomial (NB) distribution with generalized linear models (GLMs) 
     in the `r Biocpkg("edgeR")` package [@robinson2010edger; @mccarthy2012differential], 
     with additional sophistication provided by quasi-likelihood (QL) methods [@lund2012ql].
-Code is also provided for filtering, normalization and region-level control of the false discovery rate (FDR).
-Finally, annotation and visualization of the DB regions is described.
+Code is also provided for filtering, normalization and region-level control of the FDR.
+Finally, annotation and visualization of the DB regions is described using `r Biocpkg("Gviz")` and other packages.
 
 The application of the methods in this article will be demonstrated on two publicly available ChIP-seq data sets.
 The first data set studies changes in H3K9ac marking between pro-B and mature B cells [@domingo2012bcell].
 The second data set studies changes in CREB-binding protein (CBP) binding between wild-type and CBP knock-out cells [@kasper2014genomewide].
 A separate workflow is described for the analysis of each data set, using the sliding window approach in both cases but with different parameter settings.
-The aim is to provide readers with a variety of usage examples from which they can construct analyses of their own data.
+The intention is to provide readers with a variety of usage examples from which they can construct DB analyses of their own data.
 
 # Aligning reads in the H3K9ac libraries
 
@@ -883,7 +890,7 @@ unlink(temp.file)
 Some mapping statistics can be reported as previously described.
 For brevity, the code will not be shown here, as it is identical to that used for the H3K9ac analysis.
 
-```{r, echo=FALSE, results="hide", eval=biocbuild}
+```{r, echo=FALSE, results="hide", eval=biocbuild, message=FALSE}
 bam.files <- paste0(sra.numbers, ".bam")
 for (bam in bam.files) {
     bam.url <- paste0(core.loc, bam)
@@ -1070,7 +1077,7 @@ This allows visualization of the strand bimodality that is characteristic of gen
 In Figure 12, two adjacent sites are present at the *Gbe1* promoter, both of which exhibit increased binding in the WT genotype.
 Coverage is also substantially different between the WT replicates, consistent with the presence of a batch effect.
 
-```{r tfplot, fig.height=6, fig.width=8, fig.cap="**Figure 12:** Coverage tracks for TF binding sites that are differentially bound in the WT against the KO. Blue and red tracks represent forward- and reverse-strand coverage, respectively, on a per-million scale (capped at 5 in SRR1145788, for visibility)."}
+```{r tfplot, fig.height=6, fig.width=8, fig.cap="**Figure 12:** Coverage tracks for TF binding sites that are differentially bound in the WT (top two tracks) against the KO (last two tracks). Blue and red tracks represent forward- and reverse-strand coverage, respectively, on a per-million scale (capped at 5 in SRR1145788, for visibility)."}
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 for (i in 1:length(bam.files)) { 
