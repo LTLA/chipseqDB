@@ -3,6 +3,9 @@ title: "From reads to regions: a Bioconductor workflow to detect differential bi
 author: Aaron T. L. Lun, Gordon K. Smyth
 author_affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia; Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia 
 date: 27-08-2015
+vignette: >
+  %\VignetteIndexEntry{From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data}
+  %\VignetteEngine{knitr::rmarkdown}
 output: 
     BiocStyle::html_document:
         fig_caption: yes
