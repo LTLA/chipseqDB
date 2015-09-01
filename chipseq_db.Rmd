@@ -1,8 +1,8 @@
 ---
 title: "From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data"
 author: Aaron T. L. Lun, Gordon K. Smyth
-author_affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
-date: 22-08-2015
+author_affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia; Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia 
+date: 27-08-2015
 output: 
     BiocStyle::html_document:
         fig_caption: yes
@@ -44,7 +44,7 @@ This is a more direct strategy that avoids problems with data re-use and can pro
 However, its correct implementation is not straightforward due to the subtleties with interpretation of the false dicovery rate (FDR).
 
 This article describes a computational workflow for performing a DB analysis with sliding windows.
-The aim is to facilitate the practical implementation of window-based DB analyses, by providing detailed code and expected output.
+The aim is to facilitate the practical implementation of window-based DB analyses by providing detailed code and expected output.
 The workflow described here applies to any ChIP-seq experiment with multiple experimental conditions and with multiple biological samples within one or more of the conditions.
 It detects and summarizes DB regions between conditions in a *de novo* manner, i.e., without making any prior assumptions about the location or width of bound regions.
 Detected regions are then annotated according to their proximity to annotated genes.
@@ -349,15 +349,12 @@ Normalization is required prior to any comparisons between libraries, to elimina
 In particular, a trended bias is often observed between libraries in Figure 3.
 This refers to a systematic fold-difference in window coverage between libraries that changes according to the average abundance of the window.
 
-```{r trendplot, fig.cap="**Figure 3:** Abundance-dependent trend in the log-fold change between two H3K9ac libraries, across all retained windows. The red line represents a fitted loess curve."}
+```{r trendplot, fig.cap="**Figure 3:** Abundance-dependent trend in the log-fold change between two H3K9ac libraries (mature B over pro-B), across all windows retained after filtering."}
 win.ab <- filter.stat$abundances[keep]
 adjc <- log2(assay(filtered.data)+0.5)
 logfc <- adjc[,1] - adjc[,4]
 smoothScatter(win.ab, logfc, ylim=c(-6, 6), xlim=c(0, 5),
     xlab="Average abundance", ylab="Log-fold change")
-fit <- limma::loessFit(x=win.ab, y=logfc)
-o <- order(win.ab)
-lines(win.ab[o], fit$fitted[o], col="red")
 ```
 
 Trended biases cannot be removed by scaling methods like TMM normalization [@robinson2010scaling], as the amount of scaling required varies with the abundance of the window.
@@ -375,13 +372,11 @@ Once the offsets are applied to adjust the log-fold changes, the trend is elimin
 The cloud of points is also centred at a log-fold change of zero.
 This indicates that normalization was successful in removing the differences between libraries. 
 
-```{r normplot, fig.cap="**Figure 4:** Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Log-fold changes for all windows are shown after normalization. The red line represents a fitted loess curve."}
+```{r normplot, fig.cap="**Figure 4:** Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Log-fold changes for all windows are shown after normalization."}
 norm.adjc <- adjc - offsets/log(2)
 norm.fc <- norm.adjc[,1]-norm.adjc[,4]
 smoothScatter(win.ab, norm.fc, ylim=c(-6, 6), xlim=c(0, 5),
     xlab="Average abundance", ylab="Log-fold change")
-fit <- limma::loessFit(x=win.ab, y=norm.fc)
-lines(win.ab[o], fit$fitted[o], col="red")
 ```
 
 The implicit assumption of non-linear methods is that most windows at each abundance are not DB.
