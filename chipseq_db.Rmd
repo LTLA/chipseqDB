@@ -396,7 +396,7 @@ The high-abundance tail at zero (before normalization) probably represents micro
 They still exhibit biases consistent with background regions, which is why they lie so close to zero.
 There's not much helping this unless they get removed at the start.
 -->
-     
+
 ## Statistical modelling of biological variability 
 
 ### Introduction
