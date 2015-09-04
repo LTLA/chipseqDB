@@ -12,6 +12,16 @@ output:
 bibliography: ref.bib
 ---
 
+
+<style>
+pre, img {
+  max-width: 100%;
+  display: block;
+}
+</style>
+
+
+
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
