@@ -26,6 +26,7 @@ pre, img {
 library(BiocStyle)
 library(knitr)
 opts_chunk$set(error=FALSE)
+opts_chunk$set(fig.width=7, fig.height=7)
 opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
 biocbuild <- TRUE # BioC build starts from BAM files, not SRA.
 ```
@@ -400,12 +401,6 @@ The implicit assumption of non-linear methods is that most windows at each abund
 Any systematic difference between libraries is attributed to bias and is removed.
 This is not appropriate in situations where large-scale DB is expected, as removal of the difference would result in loss of genuine DB.
 However, there is no indication that such changes are present in this data set, so non-linear methods can be applied without too much concern.
-
-<!-- 
-The high-abundance tail at zero (before normalization) probably represents microsatellites that have been amplified up.
-They still exhibit biases consistent with background regions, which is why they lie so close to zero.
-There's not much helping this unless they get removed at the start.
--->
 
 
 
