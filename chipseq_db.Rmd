@@ -381,7 +381,7 @@ Rather, non-linear normalization methods must be used.
 This produces a matrix of offsets that can be used during GLM fitting.
 
 ```{r}
-offsets <- normalize(filtered.data, type="loess")
+offsets <- normOffsets(filtered.data, type="loess")
 head(offsets)
 ```
 
@@ -947,7 +947,7 @@ These factors can then be applied to the DB analysis with the window counts.
 
 ```{r}
 bins <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-normfacs <- normalize(bins)
+normfacs <- normOffsets(bins)
 normfacs
 ```
 
