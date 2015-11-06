@@ -656,7 +656,7 @@ meta <- elementMetadata(out.ranges)
 elementMetadata(out.ranges) <- data.frame(meta, anno)
 ```
 
-### Using the `r Biocpkg("ChIPpeakAnno")` package.
+### Using the `r Biocpkg("ChIPpeakAnno")` package
 
 As its name suggests, the `r Biocpkg("ChIPpeakAnno")` package is designed to annotate peaks from ChIP-seq experiments [@zhu2010chippeakanno].
 A `GRanges` object containing all regions of interest is supplied to the relevant function, after removing all previous metadata fields to reduce clutter.
