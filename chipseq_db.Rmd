@@ -843,6 +843,11 @@ unlink(bam.files)
 unlink(paste0(bam.files, ".bai"))
 ```
 
+```{r, echo=FALSE, results="hide"}
+rm(list=setdiff(ls(), c("blacklist", "gax", "greg", "remap", "redownload", "keep.files"))) # Cleaning out to save memory
+gc()
+```
+
 # Repeating the analysis for the CBP data
 
 ## Overview
@@ -1152,6 +1157,11 @@ Note that that the `gax` and `greg` objects are the same as those used in the vi
 ```{r, eval=!keep.files, echo=FALSE, results="hide"}
 unlink(bam.files)
 unlink(paste0(bam.files, ".bai"))
+```
+
+```{r, echo=FALSE, results="hide"}
+rm(list=setdiff(ls(), c("remap", "redownload", "keep.files")))
+gc()
 ```
 
 # Summary  
