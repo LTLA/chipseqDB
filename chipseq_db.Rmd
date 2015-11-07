@@ -31,6 +31,14 @@ opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
 remap <- FALSE # should we remap everything?
 redownload <- TRUE # should we re-download from BioC's AWS servers?
 keep.files <- FALSE # should we keep BAM files afterwards?
+clear.memory <- TRUE # should we clear objects from memory?
+```
+
+```{r, eval=clear.memory, eval=TRUE, results='hide'}
+save.image("existing_obj.Rda")
+protected <- c("blacklist", "gax", "greg", 
+    "remap", "redownload", "keep.files", "clear.memory", 
+    "core.loc", "protected")
 ```
 
 # Introduction
@@ -843,8 +851,8 @@ unlink(bam.files)
 unlink(paste0(bam.files, ".bai"))
 ```
 
-```{r, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), c("blacklist", "gax", "greg", "remap", "redownload", "keep.files", "core.loc"))) # Cleaning out to save memory
+```{r, eval=clear.memory, echo=FALSE, results="hide"}
+rm(list=setdiff(ls(), protected))
 gc()
 ```
 
@@ -1159,8 +1167,8 @@ unlink(bam.files)
 unlink(paste0(bam.files, ".bai"))
 ```
 
-```{r, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), c("remap", "redownload", "keep.files", "core.loc")))
+```{r, eval=clear.memory, echo=FALSE, results="hide"}
+rm(list=setdiff(ls(), protected))
 gc()
 ```
 
@@ -1207,5 +1215,10 @@ Victorian State Government Operational Infrastructure Support; Australian Govern
 # Acknowledgements
 
 The authors would like to thank Prof. Stephen Nutt for his valuable insights on B-cell biology.
+
+```{r, eval=clear.memory, echo=FALSE, results="hide"}
+load("existing_obj.Rda")
+unlink("existing_obj.Rda")
+```
 
 # References
