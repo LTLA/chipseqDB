@@ -35,7 +35,7 @@ clear.memory <- TRUE # should we clear objects from memory?
 ```
 
 ```{r, eval=clear.memory, eval=TRUE, results='hide'}
-pre.existing <- ls()
+pre.existing <- "infile"
 protected <- c("blacklist", "gax", "greg", 
     "remap", "redownload", "keep.files", "clear.memory", 
     "core.loc", "protected", "pre.existing", pre.existing)
