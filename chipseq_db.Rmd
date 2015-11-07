@@ -844,7 +844,7 @@ unlink(paste0(bam.files, ".bai"))
 ```
 
 ```{r, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), c("blacklist", "gax", "greg", "remap", "redownload", "keep.files"))) # Cleaning out to save memory
+rm(list=setdiff(ls(), c("blacklist", "gax", "greg", "remap", "redownload", "keep.files", "core.loc"))) # Cleaning out to save memory
 gc()
 ```
 
@@ -1160,7 +1160,7 @@ unlink(paste0(bam.files, ".bai"))
 ```
 
 ```{r, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), c("remap", "redownload", "keep.files")))
+rm(list=setdiff(ls(), c("remap", "redownload", "keep.files", "core.loc")))
 gc()
 ```
 
