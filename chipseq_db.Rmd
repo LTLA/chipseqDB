@@ -1168,7 +1168,7 @@ unlink(paste0(bam.files, ".bai"))
 ```
 
 ```{r, eval=clear.memory, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), protected))
+rm(list=setdiff(ls(), pre.existing))
 gc()
 ```
 
@@ -1179,11 +1179,6 @@ All steps are performed within the R environment and mostly use functions from B
 In particular, the core of the workflow -- the detection of DB regions -- is based on a combination of `r Biocpkg("csaw")` and `r Biocpkg("edgeR")`.
 Analyses are shown for histone mark and TF data sets, with differences in parametrization that are appropriate to each data type.
 Readers are encouraged to apply the concepts and code presented in this article to their own data.
-
-```{r, eval=clear.memory, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), pre.existing))
-gc()
-```
 
 # Software availability
 
