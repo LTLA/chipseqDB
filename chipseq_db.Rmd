@@ -34,7 +34,7 @@ keep.files <- FALSE # should we keep BAM files afterwards?
 clear.memory <- TRUE # should we clear objects from memory?
 ```
 
-```{r, eval=clear.memory, eval=TRUE, results='hide'}
+```{r, eval=clear.memory, results='hide', echo=FALSE}
 pre.existing <- "infile"
 protected <- c("blacklist", "gax", "greg", 
     "remap", "redownload", "keep.files", "clear.memory", 
@@ -115,7 +115,7 @@ for (sra in all.sra) {
 all.fastq <- paste0(sra.numbers, ".fastq")
 ```
 
-Technical replicates are merged together prior to further processing. 
+Reads from technical replicates are pooled together into a single FASTQ file prior to further processing. 
 This reflects the fact that they originate from a single library of DNA fragments.
 
 ```{r, eval=remap}
@@ -128,9 +128,10 @@ for (group in names(by.group)) {
 group.fastq <- paste0(names(by.group), ".fastq")
 ```
 
-Reads in each library are aligned to the mm10 build of the mouse genome, using the `r Biocpkg("Rsubread")` package [@liao2013subread].
+Reads in each library are aligned to the mm10 build of the mouse genome, using the `align` function in the `r Biocpkg("Rsubread")` package [@liao2013subread].
 This assumes that an index has already been constructed with the prefix `index/mm10`.
-Here, a consensus threshold of 2 is used instead of the default of 3, to accommodate the shorter length of the reads (32 bp).
+The function uses a seed-and-vote paradigm to quickly and accurately map reads to the genome, by focusing on locations that receive a number of votes above some consensus threshold.
+Here, a threshold of 2 is used instead of the default of 3, to accommodate the shorter length of the reads (32--36 bp).
 The `type` parameter is also set to optimize for genomic alignment, rather than alignment to the transcriptome.
 
 ```{r, results="hide", eval=remap, message=FALSE}
@@ -180,6 +181,7 @@ for (bam in bam.files) {
 
 The behaviour of the alignment pipeline for this data set can be easily summarized with some statistics.
 Ideally, the proportion of mapped reads should be high, while the proportion of marked reads should be low.
+Note that only reads with unique mapping locations are reported by `r Biocpkg("Rsubread")` as being successfully mapped.
 
 ```{r, eval=!remap, results="hide", echo=FALSE, message=FALSE}
 library(Rsubread)
@@ -349,13 +351,14 @@ As previously mentioned, low-abundance windows contain no binding sites and need
 This improves power by removing irrelevant tests prior to the multiple testing correction;
     avoids problems with discreteness in downstream statistical methods; 
     and reduces computational work for further analyses.
-Here, filtering is performed using the average abundance of each window [@mccarthy2012differential].
+Here, filtering is performed using the average abundance of each window [@mccarthy2012differential], which is defined as the average log-count per million for that window.
 This performs well as an independent filter statistic for NB-distributed count data [@lun2014denovo].
 
 The filter threshold is defined based on the assumption that most regions in the genome are not marked by H3K9ac.
 Reads are counted into large bins and the median coverage across those bins is used as an estimate of the background abundance.
 This estimate is then compared to the average abundances of the windows, after rescaling to account for differences in the window and bin sizes.
-Windows are only retained if they have abundances 3-fold higher than the background. 
+A window is only retained if its coverage is 3-fold higher than that of the background regions, 
+    i.e., the abundance of the window is greater than the background abundance estimate by log~2~(3) or more.
 This removes a large number of windows that are weakly or not marked and are likely to be irrelevant.
 
 ```{r}
@@ -371,7 +374,8 @@ The chosen threshold is greater than the abundances of most bins in the genome -
 This suggests that the filter will remove most windows lying within background regions.
 
 ```{r bghistplot, fig.cap="**Figure 2:** Histogram of average abundances across all 2 kbp genomic bins. The filter threshold is shown as the red line."}
-hist(filter.stat$back.abundances, xlab="Background abundance", main="", breaks=50)
+hist(filter.stat$back.abundances, main="", breaks=50,
+    xlab="Background abundance (log2-CPM)")
 threshold <- filter.stat$abundances[1] - filter.stat$filter[1] + log2(min.fc)
 abline(v=threshold, col="red")
 ```
@@ -398,7 +402,7 @@ smoothScatter(win.ab, logfc, ylim=c(-6, 6), xlim=c(0, 5),
 
 Trended biases cannot be removed by scaling methods like TMM normalization [@robinson2010scaling], as the amount of scaling required varies with the abundance of the window.
 Rather, non-linear normalization methods must be used.
-`r Biocpkg("csaw")` implements a version of the fast loess method [@ballman2004fast] that is adapted to count data.
+`r Biocpkg("csaw")` implements a version of the fast loess method [@ballman2004fast] that has been modified to handle count data [@lun2015csaw].
 This produces a matrix of offsets that can be used during GLM fitting.
 
 ```{r}
