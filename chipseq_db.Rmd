@@ -1216,7 +1216,7 @@ Readers should note that the read alignment steps for each data set can only be 
 This is because the various `system` calls assume that a Unix-style command-line interface is present.
 In addition, `r Biocpkg("Rsubread")` is not supported for Windows.
 However, downstream analyses of the BAM files can be performed using any platform on which *R* can be installed.
-The entire workflow takes 3-4 hours to run and requires 10 GB of RAM.
+The entire workflow takes 7-8 hours to run and requires 10 GB of RAM.
 
 # Author contributions
 
