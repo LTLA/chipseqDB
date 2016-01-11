@@ -475,7 +475,6 @@ summary(y$trended.dispersion)
 ```
 
 The NB dispersion trend is visualized in Figure 5 as the biological coefficient of variation (BCV), i.e., the square root of the NB dispersion.
-A trend that decreases to a plateau with increasing abundance is typical of many analyses, including those of RNA-seq and ChIP-seq data.
 Note that only the trended dispersion will be used in the downstream steps -- the common and tagwise values are only shown for diagnostic purposes.
 Specifically, the common BCV provides an overall measure of the variability in the data set, averaged across all windows.
 Data sets with common BCVs ranging from 10 to 20% are considered to have low variability, i.e., counts are highly reproducible.
@@ -819,7 +818,7 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
 Both of the examples above involve differential marking within broad regions spanning several kilobases.
 This is consistent with changes in the marking profile across a large number of nucleosomes.
 However, H3K9ac marking can also be concentrated into small regions, involving only a few nucleosomes.
-`r Biocpkg("csaw")` is equally capable of detecting "sharp" DB within these small regions.
+`r Biocpkg("csaw")` is equally capable of detecting sharp DB within these small regions.
 This can be demonstrated by examining those clusters that contain a smaller number of windows.
 
 ```{r}
@@ -1141,8 +1140,8 @@ meta <- elementMetadata(out.ranges)
 elementMetadata(out.ranges) <- data.frame(meta, anno)
 ```
 
-The top-ranked DB event will be visualized here.
-This corresponds to a simple DB event, as all windows are changing in the same direction, i.e., up in the WT.
+One of the top-ranked DB regions will be visualized here.
+This corresponds to a simple DB event as all windows are changing in the same direction, i.e., up in the WT.
 The binding region is also quite small relative to some of the H3K9ac examples, consistent with sharp TF binding to a specific recognition site.
 
 ```{r}
