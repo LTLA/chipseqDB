@@ -2,7 +2,7 @@
 title: "From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data"
 author: Aaron T. L. Lun, Gordon K. Smyth
 author_affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia; Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia 
-date: 21 December 2015
+date: 5 May 2016
 vignette: >
   %\VignetteIndexEntry{From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data}
   %\VignetteEngine{knitr::rmarkdown}
@@ -1146,7 +1146,7 @@ The binding region is also quite small relative to some of the H3K9ac examples, 
 
 ```{r}
 o <- order(out.ranges$PValue)    
-cur.region <- out.ranges[o[1]]
+cur.region <- out.ranges[o[2]]
 cur.region
 ```
 
