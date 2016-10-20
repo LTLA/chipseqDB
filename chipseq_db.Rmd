@@ -3,7 +3,7 @@ title: "From reads to regions: a Bioconductor workflow to detect differential bi
 author: 
   name: Aaron T. L. Lun, Gordon K. Smyth
   affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia; Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
-date: 5 May 2016
+date: 20 October 2016
 vignette: >
   %\VignetteIndexEntry{From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data}
   %\VignetteEngine{knitr::rmarkdown}
@@ -311,7 +311,7 @@ This is identified from Figure 1 and is used as the average fragment length for 
 
 ```{r}
 x <- correlateReads(bam.files, param=reform(param, dedup=TRUE))
-frag.len <- which.max(x) - 1
+frag.len <- maximizeCcf(x)
 frag.len
 ```
 
@@ -978,7 +978,7 @@ The average fragment length is estimated by maximizing the cross-correlation fun
 
 ```{r}
 x <- correlateReads(bam.files, param=reform(param, dedup=TRUE))
-frag.len <- which.max(x) - 1
+frag.len <- maximizeCcf(x)
 frag.len
 ```
 
@@ -1202,10 +1202,11 @@ Readers are encouraged to apply the concepts and code presented in this article 
 
 # Software availability
 
-This workflow depends on various packages from version 3.2 of the Bioconductor project, running on *R* version 3.2.2 or higher.
+This workflow depends on various packages from version 3.4 of the Bioconductor project, running on *R* version 3.3.1 or higher.
 It requires a number of software packages, including `r Biocpkg("csaw")`, `r Biocpkg("edgeR")`, `r Biocpkg("Rsubread")`, `r Biocpkg("Rsamtools")`, `r Biocpkg("Gviz")`, `r Biocpkg("rtracklayer")` and `r Biocpkg("ChIPpeakAnno")`.
 It also depends on the annotation packages `r Biocannopkg("org.Mm.eg.db")` and `r Biocannopkg("TxDb.Mmusculus.UCSC.mm10.knownGene")`.
 Version numbers for all packages used are shown below.
+Installation of required packages and execution of the workflow can be performed by following the instructions at https://www.bioconductor.org/help/workflows/chipseqDB.
 
 ```{r}
 sessionInfo()
