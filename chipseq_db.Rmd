@@ -36,10 +36,9 @@ clear.memory <- TRUE # should we clear objects from memory?
 ```
 
 ```{r, eval=clear.memory, results='hide', echo=FALSE}
-pre.existing <- "infile"
 protected <- c("blacklist", "gax", "greg", 
     "remap", "redownload", "keep.files", "clear.memory", 
-    "core.loc", "protected", "pre.existing", pre.existing)
+    "core.loc", "protected", "infile")
 ```
 
 # Introduction
@@ -1192,7 +1191,7 @@ unlink(paste0(bam.files, ".bai"))
 ```
 
 ```{r, eval=clear.memory, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), pre.existing))
+rm(list=setdiff(ls(), protected))
 gc()
 ```
 
