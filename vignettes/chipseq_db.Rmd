@@ -1,6 +1,6 @@
 ---
 title: "From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data"
-author: 
+author:
   - name: Aaron T. L. Lun
     affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
   - name: Gordon K. Smyth
@@ -9,7 +9,7 @@ date: 23 February 2017
 vignette: >
   %\VignetteIndexEntry{From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data}
   %\VignetteEngine{knitr::rmarkdown}
-output: 
+output:
     BiocStyle::html_document:
         fig_caption: yes
 bibliography: ref.bib
@@ -39,8 +39,8 @@ clear.memory <- TRUE # should we clear objects from memory?
 ```
 
 ```{r, eval=clear.memory, results='hide', echo=FALSE}
-protected <- c("blacklist", "gax", "greg", 
-    "remap", "redownload", "keep.files", "clear.memory", 
+protected <- c("blacklist", "gax", "greg",
+    "remap", "redownload", "keep.files", "clear.memory",
     "core.loc", "protected", "infile")
 ```
 
@@ -51,7 +51,7 @@ Conventional analyses of ChIP-seq data aim to detect absolute binding (i.e., the
 However, a number of recent studies have focused on the detection of changes in the binding profile between conditions [@rossinnes2012differential; @pal2013global].
 These differential binding (DB) analyses involve counting reads into genomic intervals, and then testing those counts for significant differences between conditions.
 This defines a set of putative DB regions for further examination.
-DB analyses are easier to perform than their conventional counterparts, 
+DB analyses are easier to perform than their conventional counterparts,
    as the effect of genomic biases is largely mitigated when counts for different libraries are compared at the same genomic region.
 DB regions may also be more relevant as the change in binding can be associated with the biological difference between conditions.
 
@@ -77,8 +77,8 @@ The workflow is based primarily on software packages from the open-source Biocon
 It contains all steps that are necessary for detecting DB regions, starting from the raw read sequences.
 Reads are first aligned to the genome using the `r Biocpkg("Rsubread")` package [@liao2013subread].
 These are counted into sliding windows with `r Biocpkg("csaw")`, to quantify binding intensity across the genome [@lun2014denovo; @lun2015csaw].
-Statistical modelling is based on the negative binomial (NB) distribution with generalized linear models (GLMs) 
-    in the `r Biocpkg("edgeR")` package [@robinson2010edger; @mccarthy2012differential], 
+Statistical modelling is based on the negative binomial (NB) distribution with generalized linear models (GLMs)
+    in the `r Biocpkg("edgeR")` package [@robinson2010edger; @mccarthy2012differential],
     with additional sophistication provided by quasi-likelihood (QL) methods [@lund2012ql].
 Code is also provided for filtering, normalization and region-level control of the FDR.
 Finally, annotation and visualization of the DB regions is described using `r Biocpkg("Gviz")` and other packages.
@@ -103,9 +103,9 @@ The experiment contains two biological replicates in total for each of the two c
 Multiple technical replicates exist for some of the biological replicates, and are indicated as those files with the same `grouping`.
 
 ```{r}
-sra.numbers <- c("SRR499718", "SRR499719", "SRR499720", "SRR499721", 
+sra.numbers <- c("SRR499718", "SRR499719", "SRR499720", "SRR499721",
     "SRR499734", "SRR499735", "SRR499736", "SRR499737", "SRR499738")
-grouping <- c("proB-8113", "proB-8113", "proB-8108", "proB-8108", 
+grouping <- c("proB-8113", "proB-8113", "proB-8108", "proB-8108",
     "matureB-8059", "matureB-8059", "matureB-8059", "matureB-8059", "matureB-8086")
 all.sra <- paste0(sra.numbers, ".lite.sra")
 data.frame(SRA=all.sra, Condition=grouping)
@@ -122,7 +122,7 @@ for (sra in all.sra) {
 all.fastq <- paste0(sra.numbers, ".fastq")
 ```
 
-Reads from technical replicates are pooled together into a single FASTQ file prior to further processing. 
+Reads from technical replicates are pooled together into a single FASTQ file prior to further processing.
 This reflects the fact that they originate from a single library of DNA fragments.
 
 ```{r, eval=remap}
@@ -149,7 +149,7 @@ align(index="index/mm10", readfile1=group.fastq, TH1=2, type=1,
 ```
 
 In each of the resulting BAM files, alignments are re-sorted by their mapping locations.
-This is required for input into `r Biocpkg("csaw")`, 
+This is required for input into `r Biocpkg("csaw")`,
     but is also useful for other programs like genome browsers that depend on sorting and indexing for rapid retrieval of reads.
 
 ```{r, message=FALSE, results="hide", eval=remap}
@@ -178,7 +178,7 @@ temp.dir <- "h3k9ac_working"
 dir.create(temp.dir)
 for (bam in bam.files) {
     code <- system(sprintf("MarkDuplicates I=%s O=%s M=%s \\
-        TMP_DIR=%s AS=true REMOVE_DUPLICATES=false \\ 
+        TMP_DIR=%s AS=true REMOVE_DUPLICATES=false \\
         VALIDATION_STRINGENCY=SILENT", bam, temp.bam,   
         temp.file, temp.dir))
     stopifnot(code==0L)
@@ -351,7 +351,7 @@ This represents a preliminary filter to remove uninteresting windows correspondi
 
 As previously mentioned, low-abundance windows contain no binding sites and need to be filtered out.
 This improves power by removing irrelevant tests prior to the multiple testing correction;
-    avoids problems with discreteness in downstream statistical methods; 
+    avoids problems with discreteness in downstream statistical methods;
     and reduces computational work for further analyses.
 Here, filtering is performed using the average abundance of each window [@mccarthy2012differential], which is defined as the average log-count per million for that window.
 This performs well as an independent filter statistic for NB-distributed count data [@lun2014denovo].
@@ -359,7 +359,7 @@ This performs well as an independent filter statistic for NB-distributed count d
 The filter threshold is defined based on the assumption that most regions in the genome are not marked by H3K9ac.
 Reads are counted into large bins and the median coverage across those bins is used as an estimate of the background abundance.
 This estimate is then compared to the average abundances of the windows, after rescaling to account for differences in the window and bin sizes.
-A window is only retained if its coverage is 3-fold higher than that of the background regions, 
+A window is only retained if its coverage is 3-fold higher than that of the background regions,
     i.e., the abundance of the window is greater than the background abundance estimate by log~2~(3) or more.
 This removes a large number of windows that are weakly or not marked and are likely to be irrelevant.
 
@@ -416,7 +416,7 @@ head(offsets)
 The effect of non-linear normalization is visualized with another mean-difference plot.
 Once the offsets are applied to adjust the log-fold changes, the trend is eliminated from the plot (Figure 4).
 The cloud of points is also centred at a log-fold change of zero.
-This indicates that normalization was successful in removing the differences between libraries. 
+This indicates that normalization was successful in removing the differences between libraries.
 
 ```{r normplot, fig.cap="**Figure 4:** Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Normalized log-fold changes are shown for all windows retained after filtering."}
 norm.adjc <- adjc - offsets/log(2)
@@ -433,7 +433,7 @@ An alternative normalization strategy for these situations will be described lat
 
 
 
-## Statistical modelling of biological variability 
+## Statistical modelling of biological variability
 
 ### Introduction
 
@@ -449,8 +449,8 @@ colnames(design) <- levels(celltype)
 design
 ```
 
-As a general rule, the experimental design should contain at least two replicates in each of the biological conditions. 
-This ensures that the results for each condition are replicable and are not the result of technical artifacts such as PCR duplicates. 
+As a general rule, the experimental design should contain at least two replicates in each of the biological conditions.
+This ensures that the results for each condition are replicable and are not the result of technical artifacts such as PCR duplicates.
 Obviously, more replicates will provide more power to detect DB accurately and reliability, albeit at the cost of time and experimental resources.
 
 ### Estimating the NB dispersion
@@ -483,7 +483,7 @@ The tagwise BCVs should also be dispersed above and below the fitted trend, indi
 plotBCV(y)
 ```
 
-For most data sets, one would expect to see a trend that decreases to a plateau with increasing average abundance. 
+For most data sets, one would expect to see a trend that decreases to a plateau with increasing average abundance.
 This reflects the greater reliability of large counts, where the effects of stochasticity and technical artifacts (e.g., mapping errors, PCR duplicates) are averaged out.
 In Figure 5, the range of abundances after filtering is such that the plateau has already been reached.
 This is still a satisfactory result, as it indicates that the retained windows have low variability and more power to detect DB.
@@ -550,7 +550,7 @@ The latter is arguably more relevant for the final interpretation of the results
 Control of the region-level FDR is achieved by aggregating windows into regions and combining the *p*-values.
 Here, adjacent windows less than 100 bp apart are aggregated into clusters.
 Each cluster represents a genomic region.
-Smaller values of `tol` allow distinct marking events to kept separate, 
+Smaller values of `tol` allow distinct marking events to kept separate,
    while larger values provide a broader perspective, e.g., by considering adjacent co-regulated sites as a single entity.
 Chaining effects are mitigated by setting a maximum cluster width of 5 kbp.
 
@@ -664,7 +664,7 @@ head(anno$overlap)
 ```
 
 Annotated features that flank the region of interest are also reported.
-The description for each feature is formatted as described above but with an extra `[DISTANCE]` field, 
+The description for each feature is formatted as described above but with an extra `[DISTANCE]` field,
     representing the distance (in base pairs) between that feature and the region.
 By default, only flanking features within 5 kbp of each region are considered.
 
@@ -677,7 +677,7 @@ The annotation for each region is stored in the metadata of the `GRanges` object
 The compact string form is useful for human interpretation, as it allows rapid examination of all genic features neighbouring each region.
 
 ```{r}
-meta <- elementMetadata(out.ranges) 
+meta <- elementMetadata(out.ranges)
 elementMetadata(out.ranges) <- data.frame(meta, anno)
 ```
 
@@ -709,7 +709,7 @@ This is more convenient when the DB analysis needs to be integrated with, e.g., 
 In the code below, promoter coordinates and gene symbols are obtained from various annotation objects.
 
 ```{r}
-prom <- suppressWarnings(promoters(TxDb.Mmusculus.UCSC.mm10.knownGene, 
+prom <- suppressWarnings(promoters(TxDb.Mmusculus.UCSC.mm10.knownGene,
     upstream=3000, downstream=1000, columns=c("tx_name", "gene_id")))
 entrez.ids <- sapply(prom$gene_id, FUN=function(x) x[1]) # Using the first Entrez ID.
 gene.name <- select(org.Mm.eg.db, keys=entrez.ids, keytype="ENTREZID", column="SYMBOL")
@@ -745,20 +745,20 @@ The other is the annotation track containing gene models, with gene IDs replaced
 ```{r, message=FALSE}
 library(Gviz)
 gax <- GenomeAxisTrack(col="black", fontsize=15, size=2)
-greg <- GeneRegionTrack(TxDb.Mmusculus.UCSC.mm10.knownGene, showId=TRUE, 
+greg <- GeneRegionTrack(TxDb.Mmusculus.UCSC.mm10.knownGene, showId=TRUE,
     geneSymbol=TRUE, name="", background.title="transparent")
-symbols <- unlist(mapIds(org.Mm.eg.db, gene(greg), "SYMBOL", 
+symbols <- unlist(mapIds(org.Mm.eg.db, gene(greg), "SYMBOL",
     "ENTREZID", multiVals = "first"))
 symbol(greg) <- symbols[gene(greg)]
 ```
 
 ### Simple DB across a broad region
 
-To begin with, the top-ranking DB region will be visualized. 
+To begin with, the top-ranking DB region will be visualized.
 This represents a simple DB event where the entire region changes in one direction (Figure 8).
 Specifically, it represents an increase in H3K9ac marking at the *H2-Aa* locus.
-This is consistent with the expected biology -- 
-    H3K9ac is a mark of active gene expression [@karmodiya2012h3k9] 
+This is consistent with the expected biology --
+    H3K9ac is a mark of active gene expression [@karmodiya2012h3k9]
     and MHCII components are upregulated in mature B cells [@hoffman2002changes].
 
 ```{r}
@@ -780,10 +780,10 @@ This corrects for differences in library sizes between tracks.
 ```{r simplebroadplot, fig.width=8, fig.height=6, fig.cap="**Figure 8:** Coverage tracks for a simple DB event between pro-B and mature B cells, across a broad region in the H3K9ac data set. Read coverage for each library is shown as a per-million value at each base."}
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
-for (i in 1:length(bam.files)) { 
+for (i in 1:length(bam.files)) {
     reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
-    collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,10), 
+    collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,10),
         name=bam.files[i], col.axis="black", col.title="black",
         fill="darkgray", col.histogram=NA)
 }
@@ -795,7 +795,7 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
 
 Complex DB refers to situations where multiple DB events are occurring within the same enriched region.
 These are identified as those clusters that contain windows changing in both directions.
-Here, the second-ranking complex cluster is selected for visualization 
+Here, the second-ranking complex cluster is selected for visualization
     (the top-ranking complex cluster is adjacent to the region used in the previous example, so another region is chosen for some variety).
 
 ```{r}
@@ -816,10 +816,10 @@ This represents a complex DB event that would not be detected if reads were coun
 
 ```{r complexplot, fig.width=8, fig.height=6, fig.cap="**Figure 9:** Coverage tracks for a complex DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
-for (i in 1:length(bam.files)) { 
+for (i in 1:length(bam.files)) {
     reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
-    collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3), 
+    collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3),
         name=bam.files[i], col.axis="black", col.title="black",
         fill="darkgray", col.histogram=NA)
 }
@@ -850,13 +850,13 @@ if (!overlapsAny(cur.region, GRanges("chr16", IRanges(36665551, 36666200)), type
 Marking is increased for mature B cells within a 500 bp region (Figure 10), which is sharper than the changes in the previous two examples.
 This also coincides with the promoter of the *Cd86* gene.
 Again, this makes biological sense as CD86 is involved in regulating immunoglobulin production in activated B-cells [@podojil2003selective].
-	
+
 ```{r simplesharpplot, fig.width=8, fig.height=6, fig.cap="**Figure 10:** Coverage tracks for a sharp and simple DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
-for (i in 1:length(bam.files)) { 
+for (i in 1:length(bam.files)) {
     reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
-    collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3), 
+    collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3),
         name=bam.files[i], col.axis="black", col.title="black",
         fill="darkgray", col.histogram=NA)
 }
@@ -866,7 +866,7 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
 
 Note that the window size will determine whether sharp or broad events are preferentially detected.
 Larger windows provide more power to detect broad events (as the counts are higher), while smaller windows provide more resolution to detect sharp events.
-Optimal detection of all features can be obtained by performing analyses with multiple window sizes and consolidating the results, 
+Optimal detection of all features can be obtained by performing analyses with multiple window sizes and consolidating the results,
     though -- for brevity -- this will not be described here.
 In general, smaller window sizes are preferred as strong DB events with sufficient coverage will always be detected.
 For larger windows, detection may be confounded by other events within the window that distort the log-fold change in the counts between conditions.
@@ -906,7 +906,7 @@ data.frame(SRA=all.sra, Condition=genotype)
 SRA files are unpacked to yield FASTQ files with the raw read sequences.
 
 ```{r, eval=remap}
-for (sra in all.sra) { 
+for (sra in all.sra) {
     code <- system(paste("fastq-dump", sra))
     stopifnot(code==0L)
 }
@@ -919,7 +919,7 @@ A Phred offset of +64 is also used, instead of the default +33 used in the previ
 
 ```{r, eval=remap, message=FALSE, results="hide"}
 bam.files <- paste0(sra.numbers, ".bam")
-align(index="index/mm10", readfile1=all.fastq, type=1, phredOffset=64, 
+align(index="index/mm10", readfile1=all.fastq, type=1, phredOffset=64,
     input_format="FASTQ", output_file=bam.files)
 ```
 
@@ -939,7 +939,7 @@ for (bam in bam.files) {
     file.rename(out, bam)
     code <- system(sprintf("MarkDuplicates I=%s O=%s M=%s \\
         TMP_DIR=%s AS=true REMOVE_DUPLICATES=false \\
-        VALIDATION_STRINGENCY=SILENT", 
+        VALIDATION_STRINGENCY=SILENT",
         bam, temp.bam, temp.file, temp.dir))
     stopifnot(code==0L)
     file.rename(temp.bam, bam)
@@ -972,14 +972,14 @@ for (bam in bam.files) {
 ```{r, ref.label="mapstat", echo=FALSE}
 ```
 
-## Detecting DB between genotypes for CBP 
+## Detecting DB between genotypes for CBP
 
 ### Counting reads into windows
 
 First, a `readParam` object is constructed to standardize the parameter settings in this analysis.
 The ENCODE blacklist is again used to remove reads in problematic regions.
 For consistency, the MAPQ threshold of 50 is also re-used here for removing poorly aligned reads.
-Lower thresholds (e.g., from 10 to 20) can be used for longer reads with more reliable mapping locations - 
+Lower thresholds (e.g., from 10 to 20) can be used for longer reads with more reliable mapping locations -
     though in practice, the majority of long read alignments reported by `r Biocpkg("Rsubread")` tend to have very high or very low MAPQ scores,
     such that the exact choice of the MAPQ threshold is not a critical parameter.
 
@@ -1032,7 +1032,7 @@ The effect of normalization is visualized with some mean-difference plots betwee
 The dense cloud in each plot represents the majority of bins in the genome.
 These are assumed to mostly contain background regions.
 A non-zero log-fold change for these bins indicates that composition bias is present between libraries.
-The red line represents the log-ratio of normalization factors and passes through the centre of the cloud in each plot, 
+The red line represents the log-ratio of normalization factors and passes through the centre of the cloud in each plot,
     indicating that the bias has been successfully identified and removed.
 
 ```{r compoplot, fig.width=12, fig.height=6, fig.cap="**Figure 11:** Mean-difference plots for the bin counts, comparing library 4 to all other libraries. The red line represents the log-ratio of the normalization factors between libraries."}
@@ -1151,7 +1151,7 @@ Annotation is added using the `detailRanges` function, as previously described.
 ```{r}
 anno <- detailRanges(out.ranges, orgdb=org.Mm.eg.db,
             txdb=TxDb.Mmusculus.UCSC.mm10.knownGene)
-meta <- elementMetadata(out.ranges) 
+meta <- elementMetadata(out.ranges)
 elementMetadata(out.ranges) <- data.frame(meta, anno)
 ```
 
@@ -1179,11 +1179,11 @@ Coverage is also substantially different between the WT replicates, consistent w
 ```{r tfplot, fig.height=6, fig.width=8, fig.cap="**Figure 13:** Coverage tracks for TF binding sites that are differentially bound in the WT (top two tracks) against the KO (last two tracks). Blue and red tracks represent forward- and reverse-strand coverage, respectively, on a per-million scale (capped at 5 in SRR1145788, for visibility)."}
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
-for (i in 1:length(bam.files)) { 
+for (i in 1:length(bam.files)) {
     reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
     pcov <- as(coverage(reads[strand(reads)=="+"])/lib.sizes[i], "GRanges")
     ncov <- as(coverage(reads[strand(reads)=="-"])/-lib.sizes[i], "GRanges")
-    ptrack <- DataTrack(pcov, type="histogram", lwd=0, ylim=c(-5, 5), 
+    ptrack <- DataTrack(pcov, type="histogram", lwd=0, ylim=c(-5, 5),
         name=bam.files[i], col.axis="black", col.title="black",
         fill="blue", col.histogram=NA)
     ntrack <- DataTrack(ncov, type="histogram", lwd=0, ylim=c(-5, 5),

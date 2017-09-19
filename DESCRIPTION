@@ -1,0 +1,36 @@
+Package: chipseqDB
+Title: From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data
+Version: 1.0.0
+Date: 2017-09-05
+Authors@R: c(person(role=c("aut","cre"), "Aaron", "Lun", email = "alun@wehi.edu.au"),
+             person(role="aut", "Gordon ", "Smyth", email = "smyth@wehi.edu.au"))
+Description: This article describes a computational workflow for performing a DB analysis with sliding windows.
+    The aim is to facilitate the practical implementation of window-based DB analyses by providing detailed code
+    and expected output. The workflow described here applies to any ChIP-seq experiment with multiple experimental
+    conditions and with multiple biological samples within one or more of the conditions. It detects and summarizes
+    DB regions between conditions in a *de novo* manner, i.e., without making any prior assumptions about the location
+    or width of bound regions.Detected regions are then annotated according to their proximity to annotated genes.
+    In addition, the code can be easily adapted to accommodate batch effects, covariates and multiple experimental factors.
+Depends: R (>= 3.3.0),
+        BiocStyle,
+        ChIPpeakAnno,
+        Gviz,
+        Rsamtools,
+        Rsubread,
+        TxDb.Mmusculus.UCSC.mm10.knownGene,
+        csaw,
+        edgeR,
+        knitr,
+        locfit,
+        org.Mm.eg.db,
+        rtracklayer,
+        statmod
+License: Artistic-2.0
+Encoding: UTF-8
+LazyData: true
+VignetteBuilder: knitr
+biocViews: ChIPSeq
+Workflow: true
+Suggests: knitr, rmarkdown
+NeedsCompilation: no
+URL: https://www.bioconductor.org/help/workflows/chipseqDB/
