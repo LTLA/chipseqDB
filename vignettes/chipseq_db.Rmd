@@ -26,7 +26,8 @@ pre, img {
 
 
 ```{r style, echo=FALSE, results='hide', message=FALSE}
-library("chipseqDB")
+library(BiocStyle)
+library(knitr)
 opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
 opts_chunk$set(fig.width=7, fig.height=7)
 opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
@@ -141,6 +142,7 @@ Here, a threshold of 2 votes is used instead of the default of 3, to accommodate
 The `type` parameter is also set to optimize for genomic alignment, rather than alignment to the transcriptome.
 
 ```{r, results="hide", eval=remap, message=FALSE}
+library(Rsubread)
 bam.files <- paste0(names(by.group), ".bam")
 align(index="index/mm10", readfile1=group.fastq, TH1=2, type=1,
     input_format="FASTQ", output_file=bam.files)
@@ -151,6 +153,7 @@ This is required for input into `r Biocpkg("csaw")`,
     but is also useful for other programs like genome browsers that depend on sorting and indexing for rapid retrieval of reads.
 
 ```{r, message=FALSE, results="hide", eval=remap}
+library(Rsamtools)
 for (bam in bam.files) {
     out <- suppressWarnings(sortBam(bam, "h3k9ac_temp"))
     file.rename(out, bam)
@@ -188,6 +191,8 @@ Ideally, the proportion of mapped reads should be high (70-80% or higher), while
 Note that only reads with unique mapping locations are reported by `r Biocpkg("Rsubread")` as being successfully mapped.
 
 ```{r, eval=!remap, results="hide", echo=FALSE, message=FALSE}
+library(Rsubread)
+library(Rsamtools)
 by.group <- split(all.sra, grouping)
 bam.files <- paste0(names(by.group), ".bam")
 ```
@@ -252,6 +257,7 @@ download.file(paste0(core.loc, bed.file), bed.file)
 ```
 
 ```{r, message=FALSE}
+library(rtracklayer)
 blacklist <- import("mm10.blacklist.bed.gz")
 blacklist
 ```
@@ -282,6 +288,7 @@ The idea is to set this up once and to re-use it in all relevant functions.
 For this analysis, reads are ignored if they map to blacklist regions or do not map to the standard set of mouse nuclear chromosomes.
 
 ```{r, message=FALSE}
+library(csaw)
 standard.chr <- paste0("chr", c(1:19, "X", "Y"))
 param <- readParam(minq=50, discard=blacklist, restrict=standard.chr)
 ```
@@ -388,6 +395,7 @@ Here, a trended bias is present between libraries in Figure 3.
 This refers to a systematic fold-difference in window coverage between libraries that changes according to the average abundance of the window.
 
 ```{r trendplot, fig.cap="**Figure 3:** Abundance-dependent trend in the log-fold change between two H3K9ac libraries (mature B over pro-B), across all windows retained after filtering."}
+library(edgeR)
 win.ab <- aveLogCPM(asDGEList(filtered.data))
 adjc <- log2(assay(filtered.data)+0.5)
 logfc <- adjc[,1] - adjc[,4]
@@ -452,8 +460,13 @@ Estimation of the NB dispersion is performed using the `estimateDisp` function.
 Specifically, a NB dispersion trend is fitted to all windows against the average abundance.
 This means that empirical mean-dispersion trends can be flexibly modelled.
 
+```{r, message=FALSE, echo=FALSE, results="hide"}
+library(statmod)
+library(locfit)
+```
 
 ```{r, message=FALSE}
+library(edgeR)
 y <- asDGEList(filtered.data)
 y <- scaleOffset(y, offsets)
 y <- estimateDisp(y, design)
@@ -643,6 +656,8 @@ Briefly, features are reported as `SYMBOL|EXONS|STRAND` where `SYMBOL` represent
 Multiple overlapping features for different genes are separated by commas within the string for each region.
 
 ```{r, message=FALSE}
+library(org.Mm.eg.db)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 anno <- detailRanges(out.ranges, orgdb=org.Mm.eg.db,
     txdb=TxDb.Mmusculus.UCSC.mm10.knownGene)
 head(anno$overlap)
@@ -674,6 +689,7 @@ The gene closest to each region is then reported.
 Gene coordinates are taken from the NCBI mouse 38 annotation, which is roughly equivalent to the annotation in the mm10 genome build.
 
 ```{r, message=FALSE}
+library(ChIPpeakAnno)
 data(TSS.mouse.GRCm38)
 minimal <- out.ranges
 elementMetadata(minimal) <- NULL
@@ -727,6 +743,7 @@ One is the genome axis track, to display the genomic coordinates across the plot
 The other is the annotation track containing gene models, with gene IDs replaced by symbols (where possible) for easier reading.
 
 ```{r, message=FALSE}
+library(Gviz)
 gax <- GenomeAxisTrack(col="black", fontsize=15, size=2)
 greg <- GeneRegionTrack(TxDb.Mmusculus.UCSC.mm10.knownGene, showId=TRUE,
     geneSymbol=TRUE, name="", background.title="transparent")
