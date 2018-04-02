@@ -1,13 +1,17 @@
 ---
-title: "From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data"
+title: "Detecting differential binding in H3K9ac data"
 author:
   - name: Aaron T. L. Lun
-    affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+    affiliation: 
+    - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
+    - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
   - name: Gordon K. Smyth
-    affiliation: The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia; Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
-date: 23 February 2017
+    affiliation: 
+    - *WEHI
+    - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+date: 2 April 2018 
 vignette: >
-  %\VignetteIndexEntry{From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data}
+  %\VignetteIndexEntry{Detecting differential binding in H3K9ac data}
   %\VignetteEngine{knitr::rmarkdown}
 output:
     BiocStyle::html_document:
@@ -15,85 +19,16 @@ output:
 bibliography: ref.bib
 ---
 
-
-<style>
-pre, img {
-  max-width: 100%;
-  display: block;
-}
-</style>
-
-
-
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
 opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
-opts_chunk$set(fig.width=7, fig.height=7)
-opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
-
-remap <- FALSE # should we remap everything?
-redownload <- TRUE # should we re-download from BioC's AWS servers?
-keep.files <- FALSE # should we keep BAM files afterwards?
-clear.memory <- TRUE # should we clear objects from memory?
+opts_chunk$set(fig.asp=1)
 ```
 
-```{r, eval=clear.memory, results='hide', echo=FALSE}
-protected <- c("blacklist", "gax", "greg",
-    "remap", "redownload", "keep.files", "clear.memory",
-    "core.loc", "protected", "infile")
-```
-
-# Introduction
-
-Chromatin immunoprecipitation with sequencing (ChIP-seq) is a popular technique for identifying the genomic binding sites of a target protein.
-Conventional analyses of ChIP-seq data aim to detect absolute binding (i.e., the presence or absence of a binding site) based on peaks in the read coverage.
-However, a number of recent studies have focused on the detection of changes in the binding profile between conditions [@rossinnes2012differential; @pal2013global].
-These differential binding (DB) analyses involve counting reads into genomic intervals, and then testing those counts for significant differences between conditions.
-This defines a set of putative DB regions for further examination.
-DB analyses are easier to perform than their conventional counterparts,
-   as the effect of genomic biases is largely mitigated when counts for different libraries are compared at the same genomic region.
-DB regions may also be more relevant as the change in binding can be associated with the biological difference between conditions.
-
-The key step in the DB analysis is the manner in which reads are counted.
-The most obvious strategy is to count reads into pre-defined regions of interest, like promoters or gene bodies [@pal2013global].
-This is simple but will not capture changes outside of those regions.
-In contrast, *de novo* analyses do not depend on pre-specified regions, instead using empirically defined peaks or sliding windows for read counting.
-Peak-based methods are implemented in the `r Biocpkg("DiffBind")` and `r Biocpkg("DBChIP")` software packages [@rossinnes2012differential; @liang2012detecting],
-    which count reads into peak intervals that have been identified with software like MACS [@zhang2008macs].
-This requires some care to maintain statistical rigour, as peaks are called with the same data used to test for DB.
-Alternatively, window-based approaches count reads into sliding windows across the genome.
-This is a more direct strategy that avoids problems with data re-use and can provide increased DB detection power [@lun2014denovo].
-However, its correct implementation is not straightforward due to the subtleties with interpretation of the false discovery rate (FDR).
-
-This article describes a computational workflow for performing a DB analysis with sliding windows.
-The aim is to facilitate the practical implementation of window-based DB analyses by providing detailed code and expected output.
-The workflow described here applies to any ChIP-seq experiment with multiple experimental conditions and with multiple biological samples within one or more of the conditions.
-It detects and summarizes DB regions between conditions in a *de novo* manner, i.e., without making any prior assumptions about the location or width of bound regions.
-Detected regions are then annotated according to their proximity to annotated genes.
-In addition, the code can be easily adapted to accommodate batch effects, covariates and multiple experimental factors.
-
-The workflow is based primarily on software packages from the open-source Bioconductor project [@huber2015orchestrating].
-It contains all steps that are necessary for detecting DB regions, starting from the raw read sequences.
-Reads are first aligned to the genome using the `r Biocpkg("Rsubread")` package [@liao2013subread].
-These are counted into sliding windows with `r Biocpkg("csaw")`, to quantify binding intensity across the genome [@lun2014denovo; @lun2015csaw].
-Statistical modelling is based on the negative binomial (NB) distribution with generalized linear models (GLMs)
-    in the `r Biocpkg("edgeR")` package [@robinson2010edger; @mccarthy2012differential],
-    with additional sophistication provided by quasi-likelihood (QL) methods [@lund2012ql].
-Code is also provided for filtering, normalization and region-level control of the FDR.
-Finally, annotation and visualization of the DB regions is described using `r Biocpkg("Gviz")` and other packages.
-
-The application of the methods in this article will be demonstrated on two publicly available ChIP-seq data sets.
-The first data set studies changes in H3K9ac marking between pro-B and mature B cells [@domingo2012bcell].
-The second data set studies changes in CREB-binding protein (CBP) binding between wild-type and CBP knock-out cells [@kasper2014genomewide].
-These two studies were chosen to represent common situations where a DB analysis can be applied --
-    one involving sharp binding with CBP, and the other involving broader marking with H3K9ac.
-A separate workflow is described for the analysis of each data set, using the sliding window approach in both cases but with different parameter settings.
-The intention is to provide readers with a variety of usage examples from which they can construct DB analyses of their own data.
-
-```{r, eval=redownload, results='asis', echo=FALSE}
-cat('***Note:*** *to cite this article, please refer to https://f1000research.com/articles/4-1080/v2 for instructions.*')
-```
+<!--
+**asdas*
+-->
 
 # Aligning reads in the H3K9ac libraries
 
@@ -304,7 +239,7 @@ Strand bimodality is often observed in ChIP-seq experiments involving narrow bin
 This refers to the presence of distinct subpeaks on each strand and is quantified with cross-correlation plots [@kharchenko2008design].
 A strong peak in the cross-correlations should be observed if immunoprecipitation was successful.
 The delay distance at the peak corresponds to the distance between forward-/reverse-strand subpeaks.
-This is identified from Figure 1 and is used as the average fragment length for this analysis.
+This is identified from Figure \@ref(fig:ccfplot) and is used as the average fragment length for this analysis.
 
 ```{r}
 x <- correlateReads(bam.files, param=reform(param, dedup=TRUE))
@@ -312,7 +247,7 @@ frag.len <- maximizeCcf(x)
 frag.len
 ```
 
-```{r ccfplot, fig.cap="**Figure 1:** Cross-correlation function (CCF) against delay distance for the H3K9ac data set. The delay with the maximum correlation is shown as the red line."}
+```{r ccfplot, fig.cap="Cross-correlation function (CCF) against delay distance for the H3K9ac data set. The delay with the maximum correlation is shown as the red line."}
 plot(1:length(x)-1, x, xlab="Delay (bp)", ylab="CCF", type="l")
 abline(v=frag.len, col="red")
 text(x=frag.len, y=min(x), paste(frag.len, "bp"), pos=4, col="red")
@@ -870,388 +805,5 @@ Optimal detection of all features can be obtained by performing analyses with mu
     though -- for brevity -- this will not be described here.
 In general, smaller window sizes are preferred as strong DB events with sufficient coverage will always be detected.
 For larger windows, detection may be confounded by other events within the window that distort the log-fold change in the counts between conditions.
-
-```{r, eval=!keep.files, echo=FALSE, results="hide"}
-unlink(bam.files)
-unlink(paste0(bam.files, ".bai"))
-```
-
-```{r, eval=clear.memory, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), protected))
-gc()
-```
-
-# Repeating the analysis for the CBP data
-
-## Overview
-
-A window-based DB analysis will be shown for transcription factor (TF) data, to complement the histone mark analysis above.
-This data set compares CBP binding between wild-type (WT) and CBP knock-out (KO) animals [@kasper2014genomewide].
-The aim is to use `r Biocpkg("csaw")` and other Bioconductor packages to identify DB sites between genotypes.
-Most, if not all, of these sites should be increased in the WT, given that protein function should be compromised in the KO.
-
-## Aligning reads from CBP libraries
-
-Libraries are downloaded from the NCBI GEO data series GSE54453, using the SRA accessions listed below.
-The data set contains two biological replicates for each of the two genotypes.
-One file is available for each library, i.e., no technical replicates.
-
-```{r}
-sra.numbers <- c("SRR1145787", "SRR1145788", "SRR1145789", "SRR1145790")
-genotype <- c("wt", "wt", "ko", "ko")
-all.sra <- paste0(sra.numbers, ".sra")
-data.frame(SRA=all.sra, Condition=genotype)
-```
-
-SRA files are unpacked to yield FASTQ files with the raw read sequences.
-
-```{r, eval=remap}
-for (sra in all.sra) {
-    code <- system(paste("fastq-dump", sra))
-    stopifnot(code==0L)
-}
-all.fastq <- paste0(sra.numbers, ".fastq")
-```
-
-Reads are aligned to the mm10 genome using `r Biocpkg("Rsubread")`.
-Here, the default consensus threshold is used as the reads are longer (75 bp).
-A Phred offset of +64 is also used, instead of the default +33 used in the previous analysis.
-
-```{r, eval=remap, message=FALSE, results="hide"}
-bam.files <- paste0(sra.numbers, ".bam")
-align(index="index/mm10", readfile1=all.fastq, type=1, phredOffset=64,
-    input_format="FASTQ", output_file=bam.files)
-```
-
-Alignments in each BAM file are sorted by coordinate.
-Duplicate reads are marked, and the resulting files are indexed.
-
-```{r, ref.label="killindex", echo=FALSE, results="hide", message=FALSE, eval=remap}
-```
-
-```{r, eval=remap, results="hide"}
-temp.bam <- "cbp_temp.bam"
-temp.file <- "cbp_metric.txt"
-temp.dir <- "cbp_working"
-dir.create(temp.dir)
-for (bam in bam.files) {
-    out <- suppressWarnings(sortBam(bam, "cbp_temp"))
-    file.rename(out, bam)
-    code <- system(sprintf("MarkDuplicates I=%s O=%s M=%s \\
-        TMP_DIR=%s AS=true REMOVE_DUPLICATES=false \\
-        VALIDATION_STRINGENCY=SILENT",
-        bam, temp.bam, temp.file, temp.dir))
-    stopifnot(code==0L)
-    file.rename(temp.bam, bam)
-}
-indexBam(bam.files)
-```
-
-```{r, eval=remap, echo = FALSE, results = 'hide'}
-# Cleaning up
-unlink(all.fastq)
-unlink(temp.dir, recursive=TRUE)
-unlink(temp.file)
-```
-
-Some mapping statistics are reported as previously described.
-For brevity, the code will not be shown here, as it is identical to that used for the H3K9ac analysis.
-
-```{r, echo=FALSE, results="hide", eval=!remap, message=FALSE}
-bam.files <- paste0(sra.numbers, ".bam")
-```
-
-```{r, echo=FALSE, results="hide", eval=redownload, message=FALSE}
-for (bam in bam.files) {
-    bam.url <- paste0(core.loc, bam)
-    download.file(bam.url, bam)
-    download.file(paste0(bam.url, ".bai"), paste0(bam, ".bai"))
-}
-```
-
-```{r, ref.label="mapstat", echo=FALSE}
-```
-
-## Detecting DB between genotypes for CBP
-
-### Counting reads into windows
-
-First, a `readParam` object is constructed to standardize the parameter settings in this analysis.
-The ENCODE blacklist is again used to remove reads in problematic regions.
-For consistency, the MAPQ threshold of 50 is also re-used here for removing poorly aligned reads.
-Lower thresholds (e.g., from 10 to 20) can be used for longer reads with more reliable mapping locations -
-    though in practice, the majority of long read alignments reported by `r Biocpkg("Rsubread")` tend to have very high or very low MAPQ scores,
-    such that the exact choice of the MAPQ threshold is not a critical parameter.
-
-```{r}
-param <- readParam(minq=50, discard=blacklist)
-```
-
-The average fragment length is estimated by maximizing the cross-correlation function, as previously described.
-
-```{r}
-x <- correlateReads(bam.files, param=reform(param, dedup=TRUE))
-frag.len <- maximizeCcf(x)
-frag.len
-```
-
-Reads are then counted into sliding windows.
-For TF data analyses, smaller windows are necessary to capture sharp binding sites.
-A large window size will be suboptimal as the count for a particular site will be "contaminated" by non-specific background in the neighbouring regions.
-In this case, a window size of 10 bp is used.
-
-```{r}
-win.data <- windowCounts(bam.files, param=param, width=10, ext=frag.len)
-win.data
-```
-
-The default spacing of 50 bp is also used here.
-This may seem inappropriate, given that the windows are only 10 bp.
-However, reads lying in the interval between adjacent windows will still be counted into several windows.
-This is because reads are extended to the value of `frag.len`, which is substantially larger than the 50 bp spacing.
-Again, smaller spacings can be used but will provide little benefit, given that each extended read already overlaps multiple windows.
-
-### Normalization for composition biases
-
-Composition biases are introduced when the amount of DB in each condition is unbalanced [@robinson2010scaling; @lun2014denovo].
-More binding in one condition means that more reads are sequenced at the binding sites, leaving fewer reads for the rest of the genome.
-This suppresses the genomic coverage at non-DB sites, resulting in spurious differences between libraries.
-To remove this bias, reads are counted into large genomic bins.
-Most bins are assumed to represent non-DB background regions.
-Any systematic differences in the coverage of those bins is attributed to composition bias and is normalized out.
-Specifically, the TMM method [@robinson2010scaling] is applied to compute normalization factors from the bin counts.
-These factors are then applied to the DB analysis with the window counts.
-
-```{r}
-bins <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-normfacs <- normOffsets(bins)
-normfacs
-```
-
-The effect of normalization is visualized with some mean-difference plots between pairs of libraries (Figure 11).
-The dense cloud in each plot represents the majority of bins in the genome.
-These are assumed to mostly contain background regions.
-A non-zero log-fold change for these bins indicates that composition bias is present between libraries.
-The red line represents the log-ratio of normalization factors and passes through the centre of the cloud in each plot,
-    indicating that the bias has been successfully identified and removed.
-
-```{r compoplot, fig.width=12, fig.height=6, fig.cap="**Figure 11:** Mean-difference plots for the bin counts, comparing library 4 to all other libraries. The red line represents the log-ratio of the normalization factors between libraries."}
-y.bin <- asDGEList(bins)
-bin.ab <- aveLogCPM(y.bin)
-adjc <- cpm(y.bin, log=TRUE)
-par(cex.lab=1.5, mfrow=c(1,3))
-smoothScatter(bin.ab, adjc[,1]-adjc[,4], ylim=c(-6, 6),
-    xlab="Average abundance", ylab="Log-ratio (1 vs 4)")
-abline(h=log2(normfacs[1]/normfacs[4]), col="red")
-smoothScatter(bin.ab, adjc[,2]-adjc[,4], ylim=c(-6, 6),
-    xlab="Average abundance", ylab="Log-ratio (2 vs 4)")
-abline(h=log2(normfacs[2]/normfacs[4]), col="red")
-smoothScatter(bin.ab, adjc[,3]-adjc[,4], ylim=c(-6, 6),
-    xlab="Average abundance", ylab="Log-ratio (3 vs 4)")
-abline(h=log2(normfacs[3]/normfacs[4]), col="red")
-```
-
-Note that this normalization strategy is quite different from that in the H3K9ac analysis.
-Here, systematic DB in one direction is expected between conditions, given that CBP function is lost in the KO genotype.
-This means that the assumption of a non-DB majority (required for non-linear normalization of the H3K9ac data) is not valid.
-No such assumption is made by the binned-TMM approach described above, which makes it more appropriate for use in the CBP analysis.
-
-### Filtering of low-abundance windows
-
-Removal of low-abundance windows is performed as previously described.
-The majority of windows in background regions are filtered out upon applying a modest fold-change threshold.
-This leaves a small set of relevant windows for further analysis.
-
-```{r}
-filter.stat <- filterWindows(win.data, bins, type="global")
-min.fc <- 3
-keep <- filter.stat$filter > log2(min.fc)
-summary(keep)
-filtered.data <- win.data[keep,]
-```
-
-It should be noted that the 10 kbp bins are used here for filtering, while smaller 2 kbp bins were used in the corresponding step for the H3K9ac analysis.
-This is purely for convenience -- the 10 kbp counts for this data set were previously loaded for normalization, and can be re-used during filtering to save time.
-Changes in bin size will have little impact on the results, so long as the bins (and their counts) are large enough for precise estimation of the background abundance.
-While smaller bins provide greater spatial resolution, this is irrelevant for quantifying coverage in large background regions that span most of the genome.
-
-### Statistical modelling of biological variability
-
-Counts for each window are modelled using `r Biocpkg("edgeR")` as previously described.
-First, a design matrix needs to be constructed.
-
-```{r}
-genotype <- factor(genotype)
-design <- model.matrix(~0+genotype)
-colnames(design) <- levels(genotype)
-design
-```
-
-Estimation of the NB and QL dispersions is then performed.
-The estimated NB dispersions are substantially larger than those observed in the H3K9ac data set.
-In addition, the estimated prior d.f. is infinite.
-
-```{r}
-y <- asDGEList(filtered.data, norm.factors=normfacs)
-y <- estimateDisp(y, design)
-summary(y$trended.dispersion)
-fit <- glmQLFit(y, design, robust=TRUE)
-summary(fit$df.prior)
-```
-
-These statistics are consistent with the presence of a batch effect between replicates.
-The dispersions for all windows are inflated to a similarly large value by the batch effect, resulting in low variability in the dispersions across windows.
-This is illustrated in Figure 12 where the WT libraries are clearly separated in both dimensions of the MDS plot.
-In particular, separation of replicates on the first dimension is indicative of a systematic difference of size comparable to that between genotypes.
-
-```{r mdsplot2, fig.cap="**Figure 12:** MDS plot with two dimensions for all libraries in the CBP data set. Libraries are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT libraries."}
-plotMDS(cpm(y, log=TRUE), top=10000, labels=genotype,
-    col=c("red", "blue")[as.integer(genotype)])
-```
-
-The presence of a large batch effect between replicates is not ideal.
-Nonetheless, the DB analysis can proceed, albeit with some loss of power due to the inflated NB dispersions.
-
-### Testing for DB
-
-DB windows are identified using the QL F-test.
-Windows are clustered into regions, and the region-level FDR is controlled using Simes' method.
-All significant regions have increased CBP binding in the WT genotype.
-This is expected, given that protein function should be lost in the KO genotype.
-
-```{r}
-contrast <- makeContrasts(wt-ko, levels=design)
-res <- glmQLFTest(fit, contrast=contrast)
-merged <- mergeWindows(rowRanges(filtered.data), tol=100, max.width=5000)
-tabcom <- combineTests(merged$id, res$table)
-tabbest <- getBestTest(merged$id, res$table)
-is.sig <- tabcom$FDR <= 0.05
-summary(is.sig)
-table(tabcom$direction[is.sig])
-is.sig.pos <- (tabbest$logFC > 0)[is.sig]
-summary(is.sig.pos)
-```
-
-These results are saved to file, as previously described.
-Key objects are also saved for convenience.
-
-```{r}
-out.ranges <- merged$region
-elementMetadata(out.ranges) <- data.frame(tabcom,
-    best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
-    best.logFC=tabbest$logFC)
-saveRDS(file="cbp_results.rds", out.ranges)
-save(file="cbp_objects.Rda", win.data, bins, y)
-```
-
-## Annotation and visualization
-
-Annotation is added using the `detailRanges` function, as previously described.
-
-```{r}
-anno <- detailRanges(out.ranges, orgdb=org.Mm.eg.db,
-            txdb=TxDb.Mmusculus.UCSC.mm10.knownGene)
-meta <- elementMetadata(out.ranges)
-elementMetadata(out.ranges) <- data.frame(meta, anno)
-```
-
-One of the top-ranked DB regions will be visualized here.
-This corresponds to a simple DB event as all windows are changing in the same direction, i.e., up in the WT.
-The binding region is also quite small relative to some of the H3K9ac examples, consistent with sharp TF binding to a specific recognition site.
-
-```{r}
-o <- order(out.ranges$PValue)    
-cur.region <- out.ranges[o[2]]
-cur.region
-```
-
-```{r, results="hide", echo=FALSE}
-if (!overlapsAny(cur.region, GRanges("chr16", IRanges(70313851, 70314860)), type="equal")) {
-        warning("first region does not match expectations")
-}
-```
-
-Plotting is performed using two tracks for each library -- one for the forward-strand coverage, another for the reverse-strand coverage.
-This allows visualization of the strand bimodality that is characteristic of genuine TF binding sites.
-In Figure 13, two adjacent sites are present at the *Gbe1* promoter, both of which exhibit increased binding in the WT genotype.
-Coverage is also substantially different between the WT replicates, consistent with the presence of a batch effect.
-
-```{r tfplot, fig.height=6, fig.width=8, fig.cap="**Figure 13:** Coverage tracks for TF binding sites that are differentially bound in the WT (top two tracks) against the KO (last two tracks). Blue and red tracks represent forward- and reverse-strand coverage, respectively, on a per-million scale (capped at 5 in SRR1145788, for visibility)."}
-collected <- list()
-lib.sizes <- filtered.data$totals/1e6
-for (i in 1:length(bam.files)) {
-    reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
-    pcov <- as(coverage(reads[strand(reads)=="+"])/lib.sizes[i], "GRanges")
-    ncov <- as(coverage(reads[strand(reads)=="-"])/-lib.sizes[i], "GRanges")
-    ptrack <- DataTrack(pcov, type="histogram", lwd=0, ylim=c(-5, 5),
-        name=bam.files[i], col.axis="black", col.title="black",
-        fill="blue", col.histogram=NA)
-    ntrack <- DataTrack(ncov, type="histogram", lwd=0, ylim=c(-5, 5),
-        fill="red", col.histogram=NA)
-    collected[[i]] <- OverlayTrack(trackList=list(ptrack, ntrack))
-}
-plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)),
-    from=start(cur.region), to=end(cur.region))
-```
-
-Note that that the `gax` and `greg` objects are the same as those used in the visualization of the H3K9ac data.
-
-```{r, eval=!keep.files, echo=FALSE, results="hide"}
-unlink(bam.files)
-unlink(paste0(bam.files, ".bai"))
-```
-
-```{r, eval=clear.memory, echo=FALSE, results="hide"}
-rm(list=setdiff(ls(), protected))
-gc()
-```
-
-# Summary  
-
-This workflow describes the steps of a window-based DB analysis, from read alignment through to visualization of DB regions.
-All steps are performed within the R environment and mostly use functions from Bioconductor packages.
-In particular, the core of the workflow -- the detection of DB regions -- is based on a combination of `r Biocpkg("csaw")` and `r Biocpkg("edgeR")`.
-Analyses are shown for histone mark and TF data sets, with differences in parametrization that are appropriate to each data type.
-Readers are encouraged to apply the concepts and code presented in this article to their own data.
-
-# Software availability
-
-This workflow depends on various packages from version 3.4 of the Bioconductor project, running on *R* version 3.3.1 or higher.
-It requires a number of software packages, including `r Biocpkg("csaw")`, `r Biocpkg("edgeR")`, `r Biocpkg("Rsubread")`, `r Biocpkg("Rsamtools")`, `r Biocpkg("Gviz")`, `r Biocpkg("rtracklayer")` and `r Biocpkg("ChIPpeakAnno")`.
-It also depends on the annotation packages `r Biocannopkg("org.Mm.eg.db")` and `r Biocannopkg("TxDb.Mmusculus.UCSC.mm10.knownGene")`.
-Version numbers for all packages used are shown below.
-```{r, eval=!redownload, results='asis', echo=FALSE}
-cat('Installation of required packages and execution of the workflow can be performed by following the instructions at https://www.bioconductor.org/help/workflows/chipseqDB.')
-```
-
-```{r}
-sessionInfo()
-```
-
-For the command-line tools, the `fastq-dump` utility (version 2.4.2) from the SRA Toolkit must be installed on the system, along with the `MarkDuplicates` command from the Picard software suite (version 1.117).
-Readers should note that the read alignment steps for each data set can only be performed on Unix or Mac OS.
-This is because the various `system` calls assume that a Unix-style command-line interface is present.
-In addition, `r Biocpkg("Rsubread")` is not supported for Windows.
-However, downstream analyses of the BAM files can be performed using any platform on which *R* can be installed.
-The entire workflow takes 7-8 hours to run and requires 10 GB of RAM.
-
-# Author contributions
-
-A.T.T.L. developed and tested the workflow on the H3K9ac and CBP data sets.
-G.K.S. provided direction on the design of the workflow.
-Both A.T.T.L. and G.K.S. wrote the article.
-
-# Competing interests
-
-No competing interests were disclosed.
-
-# Grant information
-
-National Health and Medical Research Council (Program Grant 1054618 to G.K.S., Fellowship to G.K.S.);
-Victorian State Government Operational Infrastructure Support; Australian Government NHMRC IRIIS.
-
-# Acknowledgements
-
-The authors would like to thank Prof. Stephen Nutt for his valuable insights on B-cell biology.
 
 # References
