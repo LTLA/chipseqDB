@@ -1,5 +1,5 @@
 ---
-title: "Detecting differential binding in H3K9ac data"
+title: "Detecting differential enrichment of H3K9ac in murine B cells"
 author:
   - name: Aaron T. L. Lun
     affiliation: 
@@ -11,13 +11,17 @@ author:
     - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
 date: 2 April 2018 
 vignette: >
-  %\VignetteIndexEntry{Detecting differential binding in H3K9ac data}
+  %\VignetteIndexEntry{Detecting differential enrichment of H3K9ac in murine B cells}
   %\VignetteEngine{knitr::rmarkdown}
 output:
     BiocStyle::html_document:
         fig_caption: yes
 bibliography: ref.bib
 ---
+
+<!--
+****
+-->
 
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
@@ -26,15 +30,16 @@ opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
 opts_chunk$set(fig.asp=1)
 ```
 
-<!--
-**asdas*
--->
+# Overview
+
+Here, we perform a window-based DB analysis to identify regions of differential H3K9ac enrichment between pro-B and mature B cells [@domingo2012bcell].
+H3K9ac is associated with active promoters and tends to exhibit relatively narrow regions of enrichment relative to other marks such as H3K27me3.
+The experimental design contains two biological replicates for each of the two cell types.
 
 # Aligning reads in the H3K9ac libraries
 
 The first task is to download the relevant ChIP-seq libraries from the NCBI Gene Expression Omnibus (GEO) [@edgar2002geo].
 These files are obtained from the data series GSE38046, using the Sequence Read Accession (SRA) numbers listed below.
-The experiment contains two biological replicates in total for each of the two cell types, i.e., pro-B and mature B.
 Multiple technical replicates exist for some of the biological replicates, and are indicated as those files with the same `grouping`.
 
 ```{r}
@@ -48,6 +53,11 @@ data.frame(SRA=all.sra, Condition=grouping)
 
 These files are downloaded in the SRA format, and need to be unpacked to the FASTQ format prior to alignment.
 This can be done using the `fastq-dump` utility from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software).
+
+```{r, echo=FALSE, results="hide"}
+remap <- FALSE
+redownload <- any(!file.exists(paste0(grouping, ".bam")))
+```
 
 ```{r, eval=remap}
 for (sra in all.sra) {
@@ -164,14 +174,6 @@ This generates a number of index files at the same location as the BAM files.
 indexBam(bam.files)
 ```
 
-```{r, echo = FALSE, results = 'hide', eval=remap}
-# Cleaning up
-unlink(all.fastq)
-unlink(group.fastq)
-unlink(temp.dir, recursive=TRUE)
-unlink(temp.file)
-```
-
 # Obtaining the ENCODE blacklist for mm10
 
 A number of genomic regions contain high artifactual signal in ChIP-seq experiments.
@@ -205,8 +207,6 @@ Thus, the ENCODE blacklist is preferred for most applications.
 Alternatively, if negative control libraries are available, they can be used to empirically identify problematic regions with the `r Biocpkg("GreyListChIP")` package.
 These regions should be ignored as they have high coverage in the controls and are unlikely to be genuine binding sites.
 
-# Testing for DB between pro-B and mature B cells
-
 ## Setting up the analysis parameters
 
 Here, the settings for the DB analysis are specified.
@@ -233,7 +233,7 @@ This avoids spurious results due to weak or non-unique alignments.
 While a MAPQ threshold of 50 is conservative, a stringent threshold is necessary here due to the short length of the reads.
 Note that the range of MAPQ scores will vary between aligners, so some inspection of the BAM files is necessary to choose an appropriate value.
 
-## Computing the average fragment length
+# Computing the average fragment length
 
 Strand bimodality is often observed in ChIP-seq experiments involving narrow binding events like H3K9ac marking.
 This refers to the presence of distinct subpeaks on each strand and is quantified with cross-correlation plots [@kharchenko2008design].
@@ -259,7 +259,7 @@ However, removal of marked reads is risky as it caps the signal in high-coverage
 This can result in loss of power to detect DB, or introduction of spurious DB when the same cap is applied to libraries of different sizes.
 Thus, the marking status of each read will be ignored in the rest of the analysis, i.e., no duplicates will be removed in downstream steps.
 
-## Counting reads into windows
+# Counting reads into windows
 
 `r Biocpkg("csaw")` uses a sliding window strategy to quantify binding intensity across the genome.
 Each read is directionally extended to the average fragment length, to represent the DNA fragment from which that read was sequenced.
@@ -306,11 +306,11 @@ keep <- filter.stat$filter > log2(min.fc)
 summary(keep)
 ```
 
-The effect of the fold-change threshold is examined visually in Figure 2.
+The effect of the fold-change threshold is examined visually in Figure \@ref(fig:bghistplot).
 The chosen threshold is greater than the abundances of most bins in the genome -- presumably, those that contain background regions.
 This suggests that the filter will remove most windows lying within background regions.
 
-```{r bghistplot, fig.cap="**Figure 2:** Histogram of average abundances across all 2 kbp genomic bins. The filter threshold is shown as the red line."}
+```{r bghistplot, fig.cap="Histogram of average abundances across all 2 kbp genomic bins. The filter threshold is shown as the red line."}
 hist(filter.stat$back.abundances, main="", breaks=50,
     xlab="Background abundance (log2-CPM)")
 threshold <- filter.stat$abundances[1] - filter.stat$filter[1] + log2(min.fc)
@@ -323,13 +323,13 @@ The actual filtering itself is done by simply subsetting the `RangedSummarizedEx
 filtered.data <- win.data[keep,]
 ```
 
-## Normalizing for library-specific trended biases
+# Normalizing for library-specific trended biases
 
 Normalization is required to eliminate confounding library-specific biases prior to any comparisons between libraries.
-Here, a trended bias is present between libraries in Figure 3.
+Here, a trended bias is present between libraries in Figure \@ref(fig:trendplot).
 This refers to a systematic fold-difference in window coverage between libraries that changes according to the average abundance of the window.
 
-```{r trendplot, fig.cap="**Figure 3:** Abundance-dependent trend in the log-fold change between two H3K9ac libraries (mature B over pro-B), across all windows retained after filtering."}
+```{r trendplot, fig.cap="Abundance-dependent trend in the log-fold change between two H3K9ac libraries (mature B over pro-B), across all windows retained after filtering."}
 library(edgeR)
 win.ab <- aveLogCPM(asDGEList(filtered.data))
 adjc <- log2(assay(filtered.data)+0.5)
@@ -344,16 +344,17 @@ Rather, non-linear normalization methods must be used.
 This produces a matrix of offsets that can be used during GLM fitting.
 
 ```{r}
-offsets <- normOffsets(filtered.data, type="loess")
+filtered.data <- normOffsets(filtered.data, type="loess")
+offsets <- assay(filtered.data, "offset")
 head(offsets)
 ```
 
 The effect of non-linear normalization is visualized with another mean-difference plot.
-Once the offsets are applied to adjust the log-fold changes, the trend is eliminated from the plot (Figure 4).
+Once the offsets are applied to adjust the log-fold changes, the trend is eliminated from the plot (Figure \@ref(fig:normplot)).
 The cloud of points is also centred at a log-fold change of zero.
 This indicates that normalization was successful in removing the differences between libraries.
 
-```{r normplot, fig.cap="**Figure 4:** Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Normalized log-fold changes are shown for all windows retained after filtering."}
+```{r normplot, fig.cap="Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Normalized log-fold changes are shown for all windows retained after filtering."}
 norm.adjc <- adjc - offsets/log(2)
 norm.fc <- norm.adjc[,1]-norm.adjc[,4]
 smoothScatter(win.ab, norm.fc, ylim=c(-6, 6), xlim=c(0, 5),
@@ -366,11 +367,9 @@ The assumption of a non-DB majority is reasonable for this data set, given that 
 However, it is not appropriate in cases where large-scale DB is expected, as removal of the difference would result in loss of genuine DB.
 An alternative normalization strategy for these situations will be described later in the CBP analysis.
 
+# Statistical modelling of biological variability
 
-
-## Statistical modelling of biological variability
-
-### Introduction
+## Introduction
 
 Counts are modelled using NB GLMs in the `r Biocpkg("edgeR")` package [@mccarthy2012differential; @robinson2010edger].
 The NB distribution is useful as it can handle low, discrete counts for each window.
@@ -388,51 +387,45 @@ As a general rule, the experimental design should contain at least two replicate
 This ensures that the results for each condition are replicable and are not the result of technical artifacts such as PCR duplicates.
 Obviously, more replicates will provide more power to detect DB accurately and reliability, albeit at the cost of time and experimental resources.
 
-### Estimating the NB dispersion
+## Estimating the NB dispersion
 
 The `RangedSummarizedExperiment` object is coerced into a `DGEList` object (plus offsets) for use in `r Biocpkg("edgeR")`.
 Estimation of the NB dispersion is performed using the `estimateDisp` function.
 Specifically, a NB dispersion trend is fitted to all windows against the average abundance.
 This means that empirical mean-dispersion trends can be flexibly modelled.
 
-```{r, message=FALSE, echo=FALSE, results="hide"}
-library(statmod)
-library(locfit)
-```
-
-```{r, message=FALSE}
+```{r}
 library(edgeR)
 y <- asDGEList(filtered.data)
-y <- scaleOffset(y, offsets)
 y <- estimateDisp(y, design)
 summary(y$trended.dispersion)
 ```
 
-The NB dispersion trend is visualized in Figure 5 as the biological coefficient of variation (BCV), i.e., the square root of the NB dispersion.
+The NB dispersion trend is visualized in Figure \@ref(fig:bcvplot) as the biological coefficient of variation (BCV), i.e., the square root of the NB dispersion.
 Note that only the trended dispersion will be used in the downstream steps -- the common and tagwise values are only shown for diagnostic purposes.
 Specifically, the common BCV provides an overall measure of the variability in the data set, averaged across all windows.
 Data sets with common BCVs ranging from 10 to 20% are considered to have low variability, i.e., counts are highly reproducible.
 The tagwise BCVs should also be dispersed above and below the fitted trend, indicating that the fit was successful.
 
-```{r bcvplot, fig.cap="**Figure 5:** Abundance-dependent trend in the BCV for each window, represented by the blue line. Common (red) and tagwise estimates (black) are also shown."}
+```{r bcvplot, fig.cap="Abundance-dependent trend in the BCV for each window, represented by the blue line. Common (red) and tagwise estimates (black) are also shown."}
 plotBCV(y)
 ```
 
 For most data sets, one would expect to see a trend that decreases to a plateau with increasing average abundance.
 This reflects the greater reliability of large counts, where the effects of stochasticity and technical artifacts (e.g., mapping errors, PCR duplicates) are averaged out.
-In Figure 5, the range of abundances after filtering is such that the plateau has already been reached.
+In Figure \@ref(fig:bcvplot), the range of abundances after filtering is such that the plateau has already been reached.
 This is still a satisfactory result, as it indicates that the retained windows have low variability and more power to detect DB.
 
-### Estimating the QL dispersion
+## Estimating the QL dispersion
 
 Additional modelling is provided with the QL methods in `r Biocpkg("edgeR")` [@lund2012ql].
 This introduces a QL dispersion parameter for each window, which captures variability in the NB dispersion around the fitted trend for each window.
 Thus, the QL dispersion can model window-specific variability, whereas the NB dispersion trend is averaged across many windows.
 However, with limited replicates, there is not enough information for each window to stably estimate the QL dispersion.
 This is overcome by sharing information between windows with empirical Bayes (EB) shrinkage.
-The instability of the QL dispersion estimates is reduced by squeezing the estimates towards an abundance-dependent trend (Figure 6).
+The instability of the QL dispersion estimates is reduced by squeezing the estimates towards an abundance-dependent trend (Figure \@ref(fig:qlplot)).
 
-```{r qlplot, fig.cap="**Figure 6:** Effect of EB shrinkage on the raw QL dispersion estimate for each window (black) towards the abundance-dependent trend (blue) to obtain squeezed estimates (red)."}
+```{r qlplot, fig.cap="Effect of EB shrinkage on the raw QL dispersion estimate for each window (black) towards the abundance-dependent trend (blue) to obtain squeezed estimates (red)."}
 fit <- glmQLFit(y, design, robust=TRUE)
 plotQLDisp(fit)
 ```
@@ -447,22 +440,22 @@ Also note the use of `robust=TRUE`, which reduces the sensitivity of the EB proc
 summary(fit$df.prior)
 ```
 
-### Examining the data with MDS plots
+## Examining the data with MDS plots
 
 Multi-dimensional scaling (MDS) plots are used to examine the similarities between libraries.
 The distance between a pair of libraries on this plot represents the overall log-fold change between those libraries.
 Ideally, replicates should cluster together while samples from different conditions should be separate.
-In Figure 7, strong separation in the first dimension is observed between libraries from different cell types.
+In Figure \@ref(fig:mdsplot), strong separation in the first dimension is observed between libraries from different cell types.
 This indicates that significant differences are likely to be present between cell types in this data set.
 
-```{r mdsplot, fig.cap="**Figure 7:** MDS plot with two dimensions for all libraries in the H3K9ac data set. Libraries are labelled and coloured according to the cell type."}
+```{r mdsplot, fig.cap="MDS plot with two dimensions for all libraries in the H3K9ac data set. Libraries are labelled and coloured according to the cell type."}
 plotMDS(norm.adjc, labels=celltype,
     col=c("red", "blue")[as.integer(celltype)])
 ```
 
-## Testing for DB and controlling the FDR
+# Testing for DB and controlling the FDR
 
-### Testing for DB with QL F-tests
+## Testing for DB with QL F-tests
 
 Each window is tested for significant differences between cell types using the QL F-test [@lund2012ql].
 This is superior to the likelihood ratio test that is typically used for GLMs, as the QL F-test accounts for the uncertainty in dispersion estimation.
@@ -475,7 +468,7 @@ res <- glmQLFTest(fit, contrast=contrast)
 head(res$table)
 ```
 
-### Controlling the FDR across regions
+## Controlling the FDR across regions
 
 One might attempt to control the FDR by applying the Benjamini-Hochberg (BH) method to the window-level *p*-values [@benjamini1995controlling].
 However, the features of interest are not windows, but the genomic regions that they represent.
@@ -506,7 +499,7 @@ head(tabcom)
 Each row of the output table contains the statistics for a single cluster, including the combined *p*-value before and after the BH correction.
 Additional fields include `nWindows`, the total number of windows in the cluster; `logFC.up`, the number of windows with a DB log-fold change above 0.5; and `log.FC.down`, the number fof windows with a log-fold change below -0.5.
 
-### Examining the scope and direction of DB
+## Examining the scope and direction of DB
 
 The total number of DB regions at a FDR of 5% is easily calculated.
 
@@ -523,7 +516,6 @@ Otherwise, the reported direction is the same as that of the windows, i.e., `"up
 ```{r}
 table(tabcom$direction[is.sig])
 ```
-
 
 Another approach is to use the log-fold change of the most significant window (identified with the `getBestTest` function) as a proxy for the log-fold change of the cluster.
 
@@ -545,9 +537,9 @@ summary(is.sig.pos)
 This approach is generally satisfactory, though it will not capture multiple changes in opposite directions.
 It also tends to overstate the change in each cluster.
 
-## Saving results to file
+# Saving results to file
 
-To save results, one approach is to store all statistics in the metadata of a `GRanges` object.
+One approach to saving results is to store all statistics in the metadata of a `GRanges` object.
 This is useful as it keeps the statistics and coordinates together for each cluster, avoiding problems with synchronization in downstream steps.
 The midpoint and log-fold change of the best window are also stored.
 The updated `GRanges` object is then saved to file as a serialized R object with the `saveRDS` function.
@@ -637,7 +629,7 @@ This will report each overlapping feature in a separate entry of the returned `G
 In contrast, `detailRanges` will report all overlapping features for a region as a single string, i.e., each input region has one output value.
 Which is preferable depends on the purpose of the annotation -- the `detailRanges` output is more convenient for direct annotation of a DB list, while the `annotatePeakInBatch` output contains more information and is more convenient for further manipulation.
 
-### Reporting gene-based results
+## Reporting gene-based results
 
 Another approach to annotation is to flip the problem around, such that DB statistics are reported directly for features of interest like genes.
 This is more convenient when the DB analysis needs to be integrated with, e.g., DE analyses of matching RNA-seq data.
@@ -667,9 +659,9 @@ Using promoter-level counts would not provide enough spatial resolution to detec
 In particular, detection may be compromised by non-specific background or the presence of multiple opposing DB events in the same promoter.
 Combining window-level statistics is preferable as resolution is maintained for optimal performance.
 
-## Visualizing DB results
+# Visualizing DB results
 
-### Overview
+## Overview
 
 Here, the `r Biocpkg("Gviz")` package is used to visualize read coverage across the data set at regions of interest.
 Coverage in each BAM file will be represented by a single track.
@@ -687,10 +679,10 @@ symbols <- unlist(mapIds(org.Mm.eg.db, gene(greg), "SYMBOL",
 symbol(greg) <- symbols[gene(greg)]
 ```
 
-### Simple DB across a broad region
+## Simple DB across a broad region
 
 To begin with, the top-ranking DB region will be visualized.
-This represents a simple DB event where the entire region changes in one direction (Figure 8).
+This represents a simple DB event where the entire region changes in one direction (Figure \@ref(fig:simplebroadplot)).
 Specifically, it represents an increase in H3K9ac marking at the *H2-Aa* locus.
 This is consistent with the expected biology --
     H3K9ac is a mark of active gene expression [@karmodiya2012h3k9]
@@ -712,7 +704,7 @@ One track is plotted for each library, in addition to the coordinate and annotat
 Coverage is plotted in terms of sequencing depth-per-million at each base.
 This corrects for differences in library sizes between tracks.
 
-```{r simplebroadplot, fig.width=8, fig.height=6, fig.cap="**Figure 8:** Coverage tracks for a simple DB event between pro-B and mature B cells, across a broad region in the H3K9ac data set. Read coverage for each library is shown as a per-million value at each base."}
+```{r simplebroadplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a simple DB event between pro-B and mature B cells, across a broad region in the H3K9ac data set. Read coverage for each library is shown as a per-million value at each base."}
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 for (i in 1:length(bam.files)) {
@@ -726,7 +718,7 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
     from=start(cur.region), to=end(cur.region))
 ```
 
-### Complex DB across a broad region
+## Complex DB across a broad region
 
 Complex DB refers to situations where multiple DB events are occurring within the same enriched region.
 These are identified as those clusters that contain windows changing in both directions.
@@ -745,11 +737,11 @@ if (!overlapsAny(cur.region, GRanges("chr5", IRanges(122987201, 122991450)), typ
 }
 ```
 
-This region contains a bidirectional promoter where different genes are marked in the different cell types (Figure 9).
+This region contains a bidirectional promoter where different genes are marked in the different cell types (Figure \@ref(fig:complexplot)).
 Upon differentiation to mature B cells, loss of marking in one part of the region is balanced by a gain in marking in another part of the region.
 This represents a complex DB event that would not be detected if reads were counted across the entire region.
 
-```{r complexplot, fig.width=8, fig.height=6, fig.cap="**Figure 9:** Coverage tracks for a complex DB event in the H3K9ac data set, shown as per-million values."}
+```{r complexplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a complex DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
 for (i in 1:length(bam.files)) {
     reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
@@ -762,7 +754,7 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
     from=start(cur.region), to=end(cur.region))
 ```
 
-### Simple DB across a small region
+## Simple DB across a small region
 
 Both of the examples above involve differential marking within broad regions spanning several kilobases.
 This is consistent with changes in the marking profile across a large number of nucleosomes.
@@ -782,11 +774,11 @@ if (!overlapsAny(cur.region, GRanges("chr16", IRanges(36665551, 36666200)), type
 }
 ```
 
-Marking is increased for mature B cells within a 500 bp region (Figure 10), which is sharper than the changes in the previous two examples.
+Marking is increased for mature B cells within a 500 bp region (Figure \@ref(fig:simplesharpplot)), which is sharper than the changes in the previous two examples.
 This also coincides with the promoter of the *Cd86* gene.
 Again, this makes biological sense as CD86 is involved in regulating immunoglobulin production in activated B-cells [@podojil2003selective].
 
-```{r simplesharpplot, fig.width=8, fig.height=6, fig.cap="**Figure 10:** Coverage tracks for a sharp and simple DB event in the H3K9ac data set, shown as per-million values."}
+```{r simplesharpplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a sharp and simple DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
 for (i in 1:length(bam.files)) {
     reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
