@@ -805,4 +805,10 @@ Optimal detection of all features can be obtained by performing analyses with mu
 In general, smaller window sizes are preferred as strong DB events with sufficient coverage will always be detected.
 For larger windows, detection may be confounded by other events within the window that distort the log-fold change in the counts between conditions.
 
+# Session information
+
+```{r}
+sessionInfo()
+```
+
 # References
