@@ -77,9 +77,6 @@ align(index="index/mm10", readfile1=all.fastq, type=1, phredOffset=64,
 Alignments in each BAM file are sorted by coordinate.
 Duplicate reads are marked, and the resulting files are indexed.
 
-```{r, ref.label="killindex", echo=FALSE, results="hide", message=FALSE, eval=remap}
-```
-
 ```{r, eval=remap, results="hide"}
 temp.bam <- "cbp_temp.bam"
 temp.file <- "cbp_metric.txt"
@@ -120,6 +117,7 @@ for (bam in bam.files) {
 ```
 
 ```{r}
+library(Rsamtools)
 diagnostics <- list()
 for (bam in bam.files) {
     total <- countBam(bam)$records
@@ -138,7 +136,7 @@ diag.stats
 # Counting reads into windows
 
 First, a `readParam` object is constructed to standardize the parameter settings in this analysis.
-The ENCODE blacklist is again used to remove reads in problematic regions.
+The ENCODE blacklist is again used to remove reads in problematic regions [@encode2012encode].
 For consistency, the MAPQ threshold of 50 is also re-used here for removing poorly aligned reads.
 Lower thresholds (e.g., from 10 to 20) can be used for longer reads with more reliable mapping locations -
     though in practice, the majority of long read alignments reported by `r Biocpkg("Rsubread")` tend to have very high or very low MAPQ scores,
@@ -159,7 +157,7 @@ frag.len <- maximizeCcf(x)
 frag.len
 ```
 
-Reads are then counted into sliding windows.
+Reads are then counted into sliding windows using `r Biocpkg("csaw")` [@lun2015csaw].
 For TF data analyses, smaller windows are necessary to capture sharp binding sites.
 A large window size will be suboptimal as the count for a particular site will be "contaminated" by non-specific background in the neighbouring regions.
 In this case, a window size of 10 bp is used.
@@ -236,15 +234,15 @@ summary(keep)
 filtered.data <- win.data[keep,]
 ```
 
-It should be noted that the 10 kbp bins are used here for filtering, while smaller 2 kbp bins were used in the corresponding step for the H3K9ac analysis.
+Note that the 10 kbp bins are used here for filtering, while smaller 2 kbp bins were used in the corresponding step for the H3K9ac analysis.
 This is purely for convenience -- the 10 kbp counts for this data set were previously loaded for normalization, and can be re-used during filtering to save time.
 Changes in bin size will have little impact on the results, so long as the bins (and their counts) are large enough for precise estimation of the background abundance.
 While smaller bins provide greater spatial resolution, this is irrelevant for quantifying coverage in large background regions that span most of the genome.
 
 # Statistical modelling of biological variability
 
-Counts for each window are modelled using `r Biocpkg("edgeR")` as previously described.
-First, a design matrix needs to be constructed.
+Counts for each window are modelled using `r Biocpkg("edgeR")` as previously described [@mccarthy2012differential; @robinson2010edger].
+First, a design matrix is constructed for our experimental design.
 
 ```{r}
 genotype <- factor(genotype)
@@ -253,7 +251,7 @@ colnames(design) <- levels(genotype)
 design
 ```
 
-Estimation of the NB and QL dispersions is then performed.
+Estimation of the NB and QL dispersions is performed for each window [@lund2012ql].
 The estimated NB dispersions are substantially larger than those observed in the H3K9ac data set.
 In addition, the estimated prior d.f. is infinite.
 
@@ -281,7 +279,7 @@ Nonetheless, the DB analysis can proceed, albeit with some loss of power due to 
 # Testing for DB
 
 DB windows are identified using the QL F-test.
-Windows are clustered into regions, and the region-level FDR is controlled using Simes' method.
+Windows are clustered into regions, and the region-level FDR is controlled using Simes' method [@simes1986; @lun2014denovo].
 All significant regions have increased CBP binding in the WT genotype.
 This is expected, given that protein function should be lost in the KO genotype.
 
@@ -312,7 +310,7 @@ save(file="cbp_objects.Rda", win.data, bins, y)
 
 # Annotation and visualization
 
-Annotation is added using the `detailRanges` function, as previously described.
+Annotation for each region is added using the `detailRanges` function, as previously described.
 
 ```{r}
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
@@ -339,7 +337,8 @@ if (!overlapsAny(cur.region, GRanges("chr16", IRanges(70313851, 70314860)), type
 }
 ```
 
-Plotting is performed using two tracks for each library -- one for the forward-strand coverage, another for the reverse-strand coverage.
+Plotting is performed using `r Biocpkg("Gviz")` [@hahne2016visualizing] with two tracks for each library 
+-- one for the forward-strand coverage, another for the reverse-strand coverage.
 This allows visualization of the strand bimodality that is characteristic of genuine TF binding sites.
 In Figure \@ref(fig:tfplot), two adjacent sites are present at the *Gbe1* promoter, both of which exhibit increased binding in the WT genotype.
 Coverage is also substantially different between the WT replicates, consistent with the presence of a batch effect.
