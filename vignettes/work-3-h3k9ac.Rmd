@@ -670,7 +670,7 @@ Combining window-level statistics is preferable as resolution is maintained for 
 
 ## Overview
 
-Here, the `r Biocpkg("Gviz")` package is used to visualize read coverage across the data set at regions of interest.
+Here, the `r Biocpkg("Gviz")` package is used to visualize read coverage across the data set at regions of interest [@hahne2016visualizing].
 Coverage in each BAM file will be represented by a single track.
 Several additional tracks will also be included in each plot.
 One is the genome axis track, to display the genomic coordinates across the plotted region.
