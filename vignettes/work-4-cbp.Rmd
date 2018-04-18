@@ -109,6 +109,7 @@ bam.files <- paste0(sra.numbers, ".bam")
 ```
 
 ```{r, echo=FALSE, results="hide", eval=redownload, message=FALSE}
+core.loc <- "http://s3.amazonaws.com/chipseqdb-bamfiles/"
 for (bam in bam.files) {
     bam.url <- paste0(core.loc, bam)
     download.file(bam.url, bam)
