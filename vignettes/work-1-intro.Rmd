@@ -9,7 +9,7 @@ author:
   affiliation: 
   - *WEHI 
   - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
-date: 2 April 2018
+date: "`r Sys.Date()`"
 vignette: >
   %\VignetteIndexEntry{From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data}
   %\VignetteEngine{knitr::rmarkdown}
@@ -29,6 +29,15 @@ library(knitr)
 opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
 opts_chunk$set(fig.asp=1)
 ```
+
+# Workflow version information
+
+**R version**: `r R.version.string`
+
+**Bioconductor version**: `r BiocInstaller::biocVersion()`
+  
+**Package**: `r packageVersion("chipseqDB")`
+
 
 # Introduction
 

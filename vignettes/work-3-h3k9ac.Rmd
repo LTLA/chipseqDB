@@ -9,7 +9,7 @@ author:
     affiliation: 
     - *WEHI
     - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
-date: 2 April 2018 
+date: "`r Sys.Date()`"
 vignette: >
   %\VignetteIndexEntry{Detecting differential enrichment of H3K9ac in murine B cells}
   %\VignetteEngine{knitr::rmarkdown}
