@@ -330,9 +330,8 @@ Here, a trended bias is present between libraries in Figure \@ref(fig:trendplot)
 This refers to a systematic fold-difference in window coverage between libraries that changes according to the average abundance of the window.
 
 ```{r trendplot, fig.cap="Abundance-dependent trend in the log-fold change between two H3K9ac libraries (mature B over pro-B), across all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
-library(edgeR)
-win.ab <- aveLogCPM(asDGEList(filtered.data))
-adjc <- log2(assay(filtered.data)+0.5)
+win.ab <- scaledAverage(filtered.data)
+adjc <- calculateCPM(filtered.data, use.offsets=FALSE)
 logfc <- adjc[,1] - adjc[,4]
 smoothScatter(win.ab, logfc, ylim=c(-6, 6), xlim=c(0, 5),
     xlab="Average abundance", ylab="Log-fold change")
@@ -359,7 +358,7 @@ The cloud of points is also centred at a log-fold change of zero.
 This indicates that normalization was successful in removing the differences between libraries.
 
 ```{r normplot, fig.cap="Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Normalized log-fold changes are shown for all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
-norm.adjc <- adjc - offsets/log(2)
+norm.adjc <- calculateCPM(filtered.data, use.offsets=TRUE)
 norm.fc <- norm.adjc[,1]-norm.adjc[,4]
 smoothScatter(win.ab, norm.fc, ylim=c(-6, 6), xlim=c(0, 5),
     xlab="Average abundance", ylab="Log-fold change")
