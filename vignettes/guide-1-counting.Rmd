@@ -217,7 +217,7 @@ text(5, 2.8, "fragment length (ext)")
 ```
 
 The `windowCounts()` function will slide a window across the genome and count the number of (imputed) fragments overlapping each window in each library.
-This is demonstrated below using the libraries in the NF-YA data set - see below for an explanation of the settings for `ext=` and `width=`.
+This is demonstrated below using the libraries in the NF-YA data set - see below for an explanation of the parameter values for `ext=` and `width=`.
 
 ```{r}
 frag.len <- 110
@@ -247,7 +247,7 @@ data$totals
 ```
 
 Windows that are overlapped by only a few fragments are automatically filtered out based on the `filter=` argument.
-A window is removed if the sum of counts across all libraries is below the specified `filter=` (default 10).
+A window is removed if the sum of counts across all libraries is below the specified `filter=`.
 This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions.
 The default value of the filter threshold is 10, though it can be raised to reduce memory usage for large libraries.
 More sophisticated filtering is recommended and should be applied later.
@@ -284,26 +284,36 @@ Otherwise, the fragment length peak will not be visible as a separate entity.
 The size of the smooth peak can also be compared to the height of the spike to assess the signal-to-noise ratio of the data [@landt2012chipseq].
 Poor IP efficiency will result in a smaller or absent peak as bimodality is less pronounced.
 
-Cross-correlation plots can also be used for fragment length estimation of narrow histone marks such as histone acetylation and H3K4 methylation.
+Cross-correlation plots can also be used for fragment length estimation of narrow histone marks such as histone acetylation and H3K4 methylation (Figure \@ref(fig:ccf-histone)).
 However, they are less effective for regions of diffuse enrichment where bimodality is not obvious (e.g., H3K27 trimethylation).
 In such cases, the fragment length can instead be estimated from diagnostics during ChIP or library preparation, e.g., post-fragmentation gel electrophoresis images.
 
-```{r}
-# INSERT PLOT HERE.
+```{r ccf-histone, fig.cap="Cross-correlations in various histone mark data sets as a function of the delay between forward and reverse read positions."}}
+n <- 1000
+h3ac <- correlateReads("h3ac.bam", n, param=dedup.on)
+h3k27me3 <- correlateReads("h3k27me3.bam", n, param=dedup.on)
+h3k4me2 <- correlateReads("h3k4me2.bam", n, param=dedup.on)
+
+plot(0:n, h3ac, col="blue", ylim=c(0, 0.1), xlim=c(0, 1000),
+    xlab="Delay (bp)", ylab="CCF", pch=16, type="l", lwd=2)
+lines(0:n, h3k27me3, col="red", pch=16, lwd=2)
+lines(0:n, h3k4me2, col="forestgreen", pch=16, lwd=2)
+legend("topright", col=c("blue", "red", "forestgreen"),
+   c("H3Ac", "H3K27me3", "H3K4me2"), pch=16)
 ```
 
 ## With paired-end data
 
 A suitable value for `max.frag=` can be chosen by examining the distribution of fragment sizes from the `getPESizes()` function.
-In Figure \@ref(fig:pe-frag), we might use a value of around 400 bp as it is larger than the vast majority of fragment sizes.
+In Figure \@ref(fig:pe-frag), we might use a value of around 250 bp as it is larger than all fragment sizes.
 The plot can also be used to examine the quality of the PE sequencing procedure.
 The location of the mode should be consistent with the fragmentation and size selection steps in library preparation.
 
 ```{r pe-frag, fig.cap="Distribution of fragment sizes for a paired-end data set."}
+pe.bam <- system.file("extdata", "ex1.bam", package="Rsamtools") # using an example BAM file.
 out <- getPESizes(pe.bam)
-frag.sizes <- out$sizes[out$sizes<=800]
-hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)", ylab="Frequency", main="")
-abline(v=400, col="red")
+hist(out$sizes, breaks=50, xlab="Fragment sizes (bp)", ylab="Frequency", main="")
+abline(v=250, col="red")
 ```
 
 The number of fragments exceeding the maximum size is recorded for quality control.
@@ -311,7 +321,7 @@ The `getPESizes()` function also returns the number of single reads, pairs with 
 A non-negligble proportion of these reads may be indicative of problems with paired-end alignment or sequencing.
 
 ```{r}
-c(out$diagnostics, too.large=sum(out$sizes > 400))
+c(out$diagnostics, too.large=sum(out$sizes > 250))
 ```
 
 # Parametrizing the sliding windows
