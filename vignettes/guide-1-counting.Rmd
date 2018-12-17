@@ -1,0 +1,411 @@
+---
+title: Converting reads to counts
+author: 
+- name: Aaron T. L. Lun
+  affiliation:
+  - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
+  - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteIndexEntry{02. Counting reads}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}    
+output:
+  BiocStyle::html_document:
+    toc_float: true
+    titlecaps: no
+bibliography: ref.bib
+---
+
+```{r, echo=FALSE, results="hide"}
+knitr::opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
+```
+
+# Introduction 
+
+The first step in a differential binding (DB) analysis with `r Biocpkg("csaw")` is to quantify protein binding across the genome.
+We will demonstrate the available functions using ChIP-seq data for the NF-YA transcription factor (TF) in embryonic stem cells and terminal neurons [@tiwari2012chromatin].
+Sorted and indexed BAM (i.e., binary SAM) files [@li2009sam] are required as input.
+
+```{r}
+library(csaw)
+bam.files <- c("es_1.bam", "es_2.bam", "tn_1.bam", "tn_2.bam")
+```
+
+Sorting should be performed on the genomic coordinates of the mapped reads.
+Each read should only have one alignment in the file, i.e., secondary alignments should not be present.
+For a given BAM file named `xxx.bam`, the corresponding index file should be named as `xxx.bam.bai` in the same directory^[The sensibility of the supplied index is not checked prior to counting. A common mistake is to replace or update the BAM file without updating the index. This will cause `r Biocpkg("csaw")` to return incorrect results.].
+
+# Defining read extraction parameters
+
+## Using the `readParam` class 
+
+Read extraction from the BAM files is controlled with the `param=` argument across various `r Biocpkg("csaw")` functions.
+This takes a `readParam` object that specifies a number of extraction parameters.
+The idea is to define the `readParam` object once in the entire analysis pipeline, which is then reused for all relevant functions.
+This ensures that the same reads are used throughout the analysis.
+
+```{r}
+param <- readParam(minq=10)
+param
+```
+
+Users can directly access the parameter values stored in a `readParam` object with the `$` method.
+
+```{r}
+param$minq
+```
+
+Users can also modify an existing `readParam` object using the `reform()` method.
+This is safer than directly modifying the slots as appropriate type/value checking of each class member is performed.
+
+```{r}
+another.param <- reform(param, minq=20)
+another.param
+```
+
+## By mapping quality
+
+In the example above, reads are filtered out based on the minimum mapping score with the `minq=` argument.
+Low mapping scores are indicative of incorrectly and/or non-uniquely aligned sequences.
+Removal of these reads is highly recommended as it will ensure that only the reliable alignments are used in `r Biocpkg("csaw")`.
+The exact value of the threshold depends on the range of scores provided by the aligner.
+The `r Biocpkg("Rsubread")` package [@liao2013subread] was used to align the reads in this dataset, so a value of 10 might be appropriate.
+
+## By duplicate marking
+
+Reads mapping to the same genomic position can be marked as putative PCR duplicates using software like the [`MarkDuplicates` program](https://broadinstitute.github.io/picard/command-line-overview.html#MarkDuplicates).
+Marked reads in the BAM file can be ignored during counting by setting `dedup=TRUE` in the `readParam()` constructor.
+This reduces the variability caused by inconsistent amplification between replicates and avoid spurious duplicate-driven DB between groups.
+
+```{r}
+dedup.param <- readParam(dedup=TRUE)
+dedup.param
+```
+
+Duplicate removal is generally not recommended when counting reads in routine DB analyses.
+It caps the number of reads at each position, reducing DB detection power in high-abundance regions.
+Spurious differences may also be introduced when the same upper bound is applied to libraries of varying size.
+However, it may be unavoidable in some cases, e.g., involving libraries generated from low quantities of DNA.
+
+Duplicate removal is more acceptable for paired-end data where exact overlaps for both paired reads are required to define duplicates.
+This greatly reduces the probability of incorrectly discarding read pairs from non-duplicate DNA fragments, assuming that a pair-aware method was used during duplicate marking.
+
+## Restricting to chromosomes
+
+Read extraction and counting can be restricted to particular chromosomes by specifying the names of the chromosomes of interest in `restrict=`.
+This avoids the need to count reads on unassigned contigs or uninteresting chromosomes, e.g., the mitochondrial genome for ChIP-seq studies targeting nuclear factors.
+Alternatively, it allows `r Biocpkg("csaw")` to work on huge datasets or in limited memory by loading and processing only one chromosome at a time.
+
+```{r}
+restrict.param <- readParam(restrict=c("chr1", "chr10", "chrX"))
+restrict.param
+```
+
+## Discarding reads in blacklists
+
+Reads lying in blacklisted regions can also be removed by specifying the coordinates of those regions in `discard=`.
+This is intended to remove reads that are wholly aligned within known repeat regions but were not removed by the `minq=` filter.
+Repeats are problematic as changes in repeat copy number or accessibility between conditions can lead to spurious DB.
+Removal of reads within repeat regions can avoid detection of these irrelevant differences.
+
+```{r}
+repeats <- GRanges("chr1", IRanges(3000001, 3041000)) # telomere
+discard.param <- readParam(discard=repeats)
+```
+
+Coordinates of annotated repeats can be obtained from several different sources.
+Curated blacklists of problematic regions for several genomes are available from the ENCODE project [@dunham2012encode].
+This list is constructed empirically from the ENCODE datasets and includes obvious offenders like telomeres, microsatellites and some rDNA genes.
+We use the `r Biocpkg("BiocFileCache")` to download this for use throughout these workflows.
+
+```{r}
+library(BiocFileCache)
+bfc <- BiocFileCache("data", ask=FALSE)
+black.path <- bfcrpath(bfc,
+   "https://www.encodeproject.org/files/ENCFF419RSJ/@@download/ENCFF419RSJ.bed.gz")
+
+library(rtracklayer)
+black.ranges <- import(black.path)
+black.ranges
+
+black.param <- readParam(discard=black.ranges)
+black.param
+```
+
+Alternatively, repeats can be predicted from the genome sequence using software like [`RepeatMasker`](http://www.repeatmasker.org).
+These calls are available from the [UCSC website](http://hgdownload.cse.ucsc.edu/goldenpath/mm10/bigZips/) or from an appropriate masked `BSgenome` object.
+
+Using `discard=` is more appropriate than simply ignoring windows that overlap the repeat regions.
+For example, a large window might contain both repeat and non-repeat regions.
+Discarding the window because of the former will compromise detection of DB features in the latter.
+Of course, any DB sites within the discarded regions will be lost from downstream analyses.
+Some caution is therefore required when specifying the regions of disinterest^[For example, many more repeats are called by `RepeatMasker` than are present in the ENCODE blacklist, so using the former may result in loss of potentially interesting features.].
+
+## Dealing with paired-end data
+
+ChIP experiments with paired-end sequencing are accomodated by setting `pe="both"`.
+Only proper pairs are considered in which the two paired reads are on the same chromosome, face inward and are no more than `max.frag=` apart.
+This represents the expected result of sequencing both ends of short DNA fragments after immunoprecipitation.
+
+```{r}
+pe.param <- readParam(pe="both", max.frag=1000)
+pe.param
+```
+
+Note that all of the paired-end methods in `r Biocpkg("csaw")` depend on correct mate information for each alignment.
+This is usually enforced by the aligner in the output BAM file.
+Any file manipulations that might break the synchronisation should be corrected
+(e.g., with the [`FixMateInformation` program](https://broadinstitute.github.io/picard/command-line-overview.html#FixMateInformation)) prior to read counting.
+
+Paired-end data can also be treated as single-end by specifiying `pe="first"` or `"second"`.
+This will only use the first or second read of each read pair, regardless of the validity of the pair or the relative quality of the alignments.
+This setting may be useful for contrasting paired- and single-end analyses, or in disastrous situations where paired-end sequencing has failed, e.g., due to ligation between DNA fragments.
+
+# Quantifying coverage with sliding windows 
+
+`r Biocpkg("csaw")` uses a sliding window approach to quantify protein binding intensity across the genome.
+We define a window as a fixed-width genomic interval, and we count the number of fragments overlapping that window in each library.
+This is repeated after sliding the window along the genome to a new position.
+A count is thus obtained for each window in each library for further processing, e.g., to detect differential binding.
+
+The number of fragments is used for counting as the immunoprecipitation is performed on the DNA fragments.
+Any position within the fragment is a potential contact site for the protein of interest.
+For single-end data, the fragment corresponding to a read is imputed by directionally extending each read to the average fragment length (Figure \@ref(fig:directional)).
+For paired-end data, the fragment corresponding to each pair is defined as the genomic interval spanned by an inward-facing read pair.
+
+```{r directional, echo=FALSE, fig.asp=0.4, fig.wide=TRUE, fig.cap="Directional extension of reads by the average fragment length `ext` in single-end ChIP-seq data. Each extended read represents an imputed fragment, and the number of fragments overlapping a window of a given `width` is counted."}
+par(mar=c(0,0,0,0), cex=1.2)
+plot(0,0,xlim=c(-2, 12), ylim=c(-1, 3.5), type="n", axes=FALSE, xlab="", ylab="", xpd=TRUE)
+
+# Filling the left region.
+rect(0, 0, 10, 1, col="grey")
+lines(c(0, 0, 10, 10), 
+    c(-.1, -.5, -.5, -.1))
+lines(c(5, 5),
+    c(-.5, -.7))
+text(5, -.7, "width",pos=1)
+
+# Adding the left read.
+lines(c(-2, 2.5), 
+    c(1.5, 1.5), 
+    col=rgb(1, 0.7, 0.7), lwd=5)
+lines(c(-2, -0.5, -0.8),
+    c(1.5, 1.5, 1.8),
+    col="red", lwd=5)
+lines(c(-2, -2, 2.5, 2.5),
+    c(1.8, 2, 2, 1.8))
+text(-2, 1.45, "forward\nread", pos=1)
+
+# Adding the right read.
+lines(c(12, 7.5),
+    c(1.8, 1.8),
+    col=rgb(0.7, 0.7, 1), lwd=5)
+lines(c(12, 10.5, 10.8),
+    c(1.8, 1.8, 2.1),
+    col="blue", lwd=5)
+lines(c(12, 12, 7.5, 7.5),
+    c(2.1, 2.3, 2.3, 2.1))
+text(12, 1.75, "reverse\nread", pos=1)
+
+# Describing the extension.
+lines(c(0, 0, 3.1),
+    c(2, 2.8, 2.8))
+lines(c(10, 10, 6.9),
+    c(2.3, 2.8, 2.8))
+text(5, 2.8, "fragment length (ext)")
+```
+
+The `windowCounts()` function will slide a window across the genome and count the number of (imputed) fragments overlapping each window in each library.
+This is demonstrated below using the libraries in the NF-YA data set - see below for an explanation of the settings for `ext=` and `width=`.
+
+```{r}
+frag.len <- 110
+win.width <- 10
+param <- readParam(minq=10)
+data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param)
+data
+```
+
+The function returns a `RangedSummarizedExperiment` object where each row corresponds to a genomic window and each column corresponds to a library.
+The matrix of counts for each window in each library is stored as the first entry in the `assays` slot.
+
+```{r}
+head(assay(data))
+```
+
+The genomic coordinates of each window are stored in the `rowRanges` slot.
+
+```{r}
+rowRanges(data)
+```
+
+The total number of reads in each library (also referred to as the library size) is stored as `totals` in the `colData` slot.
+
+```{r}
+data$totals
+```
+
+Windows that are overlapped by only a few fragments are automatically filtered out based on the `filter=` argument.
+A window is removed if the sum of counts across all libraries is below the specified `filter=` (default 10).
+This improves memory efficiency by discarding the majority of low-abundance windows corresponding to uninteresting background regions.
+The default value of the filter threshold is 10, though it can be raised to reduce memory usage for large libraries.
+More sophisticated filtering is recommended and should be applied later.
+
+# Estimating the fragment length
+
+## With cross-correlations
+
+Cross-correlation plots are generated directly from BAM files using the `correlateReads()` function.
+This provides a measure of the immunoprecipitation (IP) efficiency of a ChIP-seq experiment [@kharchenko2008design].
+Efficient IP should yield a smooth peak at a delay distance corresponding to the average fragment length (Figure \@ref(fig:ccf-tf)).
+This reflects the strand-dependent bimodality of reads around narrow regions of enrichment, e.g., TF binding sites.
+
+```{r ccf-tf, fig.cap="Cross-correlations in the NF-YA data set as a function of the delay between forward and reverse read positions."}
+max.delay <- 500
+dedup.on <- reform(param, dedup=TRUE)
+x <- correlateReads(bam.files, max.delay, param=dedup.on)
+plot(0:max.delay, x, type="l", ylab="CCF", xlab="Delay (bp)")
+```
+
+The location of the peak is used as an estimate of the fragment length for directional read extension in single-end data.
+Typical values range from 100 to 300 bp, depending on the efficiency of sonication and the use of size selection steps in library preparation.
+An estimate of ~110 bp is obtained from Figure \@ref(fig:ccf-tf) for the NF-YA data set.
+We can find the maximum more precisely with the `maximizeCcf()` function, which returns a similar value.
+
+```{r}
+maximizeCcf(x)
+```
+
+A sharp spike may also be observed in the plot at a distance corresponding to the read length.
+This is thought to be an artifact, caused by the preference of aligners towards uniquely mapped reads.
+Duplicate removal is typically required here (hence the `dedup=TRUE` above) to reduce the size of this spike.
+Otherwise, the fragment length peak will not be visible as a separate entity.
+The size of the smooth peak can also be compared to the height of the spike to assess the signal-to-noise ratio of the data [@landt2012chipseq].
+Poor IP efficiency will result in a smaller or absent peak as bimodality is less pronounced.
+
+Cross-correlation plots can also be used for fragment length estimation of narrow histone marks such as histone acetylation and H3K4 methylation.
+However, they are less effective for regions of diffuse enrichment where bimodality is not obvious (e.g., H3K27 trimethylation).
+In such cases, the fragment length can instead be estimated from diagnostics during ChIP or library preparation, e.g., post-fragmentation gel electrophoresis images.
+
+```{r}
+# INSERT PLOT HERE.
+```
+
+## With paired-end data
+
+A suitable value for `max.frag=` can be chosen by examining the distribution of fragment sizes from the `getPESizes()` function.
+In Figure \@ref(fig:pe-frag), we might use a value of around 400 bp as it is larger than the vast majority of fragment sizes.
+The plot can also be used to examine the quality of the PE sequencing procedure.
+The location of the mode should be consistent with the fragmentation and size selection steps in library preparation.
+
+```{r pe-frag, fig.cap="Distribution of fragment sizes for a paired-end data set."}
+out <- getPESizes(pe.bam)
+frag.sizes <- out$sizes[out$sizes<=800]
+hist(frag.sizes, breaks=50, xlab="Fragment sizes (bp)", ylab="Frequency", main="")
+abline(v=400, col="red")
+```
+
+The number of fragments exceeding the maximum size is recorded for quality control.
+The `getPESizes()` function also returns the number of single reads, pairs with one unmapped read, improperly orientated pairs and inter-chromosomal pairs.
+A non-negligble proportion of these reads may be indicative of problems with paired-end alignment or sequencing.
+
+```{r}
+c(out$diagnostics, too.large=sum(out$sizes > 400))
+```
+
+# Parametrizing the sliding windows
+
+## Choosing the window size
+
+We interpret the window size as the width of the binding "footprint" for the target protein, where the protein residues directly contact the DNA.
+TF analyses typically use a small window size, e.g., 10 - 20 bp, which maximizes spatial resolution for optimal detection of narrow regions of enrichment.
+For histone marks, widths of at least 150 bp are recommended [@humburg2011chipseqr].
+This corresponds to the length of DNA wrapped up in each nucleosome, which is the smallest relevant unit for histone mark enrichment.
+We consider diffuse marks as chains of adjacent histones, for which the combined footprint may be very large (e.g., 1-10 kbp).
+
+The choice of window size controls the compromise between spatial resolution and count size.
+Larger windows will yield larger read counts that can provide more power for DB detection.
+However, spatial resolution is also lost for large windows whereby adjacent features can no longer be distinguished.
+Reads from a DB site may be counted alongside reads from a non-DB site (e.g., non-specific background) or even those from an adjacent site that is DB in the opposite direction.
+This will result in the loss of DB detection power.
+
+We might expect to be able to infer the optimal window size from the data, e.g., based on the width of the enriched regions.
+However, in practice, a clear-cut choice of distance/window size is rarely found in real datasets.
+For many non-TF targets, the widths of the enriched regions can be highly variable, suggesting that no single window size is optimal.
+Indeed, even if all enriched regions were of constant width, the width of the DB events occurring within those regions may be variable.
+This is especially true of diffuse marks where the compromise between resolution and power is more arbitrary.
+
+For non-TF targets, we suggest performing a series of DB analysis with different window sizes.
+These results from each analysis can be consolidated for comprehensive detection of DB regions at a spread of resolutions.
+
+## Controlling the spacing
+
+The spacing refers to the distance between adjacent positions when sliding a window across the genome.
+By default, this is set to 50 bp, i.e., sliding windows are shifted 50 bp forward at each step.
+Using a higher value will reduce computational work as fewer features need to be counted, which may be useful when machine memory is limited.
+However, this comes at the cost of reduced spatial resolution as adjacent positions are not counted and thus cannot be distinguished.
+
+For analyses with large windows, we suggest increasing the spacing to a fraction of the window width.
+This reduces the computational work by decreasing the number of windows and extracted counts.
+Any loss in spatial resolution due to a larger spacing interval is negligible compared to that already lost by using a large window size.
+
+For analyses with small windows, the spacing should not be larger than half the fragment length.
+This ensures that a narrow binding site will not be overlooked if it falls between two windows.
+In the rare case where the fragment length is also very small, the spacing can be set to the window width to avoid loading too many small windows.
+
+# Alternative counting options
+
+## For genomic bins
+
+Setting `bin=TRUE` will direct `windowCounts()` to count reads into contiguous bins across the genome.
+This involves a number of special settings:
+
+- `spacing=` is set to the same value used for `width=` such that each window forms a bin.
+Users should set `width=` to a reasonably large value, to avoid running out of memory with a large number of small bins.
+- Only the 5' end of each read is used for counting into bins, without any directional extension.
+(For paired-end data, the midpoint of the originating fragment is used.)
+- The {filter} argument is automatically set to 1, which means that counts will be returned for each non-empty genomic bin.
+We can also force `windowCounts()` to return bins for _all_ bins by setting `filter=0` manually.
+
+Here, we count reads in the NF-YA dataset into 10 kbp bins.
+This will be used in the later filtering and normalization steps.
+
+```{r}
+binned <- windowCounts(bam.files, width=10000, bin=TRUE, param=param)
+rowRanges(binned)
+```
+
+## For manually specified regions
+
+`r Biocpkg("csaw")` focuses on counting reads into windows.
+However, it may be occasionally desirable to use the same conventions (e.g., duplicate removal, quality score filtering) when counting reads into pre-specified regions.
+This can be performed with the `regionCounts()` function, which is largely a wrapper for `countOverlaps()` from the `r Biocpkg("GenomicRanges")` package.
+
+```{r}
+my.regions <- GRanges(c("chr11", "chr12", "chr15"),
+    IRanges(c(75461351, 95943801, 21656501),
+        c(75461610, 95944810, 21657610)))
+reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=param)
+head(assay(reg.counts))
+@
+
+## With strand specificity
+
+We can also use `r Biocpkg("csaw")` to detect changes in transcriptomic coverage in CLIP-seq, MeDIP-seq or CAGE experiments.
+Unlike ChIP-seq, these techniques also provide information about the strand of the sequenced transcript.
+To exploit this, we can set `forward=TRUE` or `FALSE` in the `readParam()` constructor to count only forward- or reverse-strand reads respectively in `windowCounts()` or `regionCounts()`.
+This allows us to test for DB on each strand separately at each location.
+
+More simply, the `strandedCounts()` wrapper function can be used to obtain strand-specific counts for each window or region.
+The strand of each output `rowRanges` indicates the strand on which reads were counted for that row.
+Up to two rows can be generated for each window or region, depending on filtering.
+Note that `forward=` must be set to `NULL` - see `?strandedCounts` for more details.
+
+```{r}
+ss.param <- reform(param, forward=NULL)
+ss.counts <- strandedCounts(bam.files, regions=my.regions, param=ss.param)
+rowRanges(ss.counts)
+```
+
+# References
