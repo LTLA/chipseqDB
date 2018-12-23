@@ -1,0 +1,12 @@
+bibentry(
+    bibtype = "article",
+    author = c(
+        person(c("Aaron", "T.", "L."), "Lun"),
+        person(c("Gordon", "K."), "Smyth")),
+    title="From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data",
+    journal="F1000Res.",
+    year="2016",
+    volume="4",
+    pages="1080",
+    doi = "10.12688/f1000research.7016.2"
+)
