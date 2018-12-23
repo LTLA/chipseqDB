@@ -1,5 +1,5 @@
 ---
-title: "From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data"
+title: "Using Bioconductor to detect differential binding in ChIP-seq data"
 author:
 - name: Aaron T. L. Lun
   affiliation: 
@@ -11,11 +11,13 @@ author:
   - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
 date: "`r Sys.Date()`"
 vignette: >
-  %\VignetteIndexEntry{From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data}
+  %\VignetteIndexEntry{1. Introduction}
   %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}    
 output:
-    BiocStyle::html_document:
-        fig_caption: yes
+  BiocStyle::html_document:
+    fig_caption: yes
+    toc_float: yes
 bibliography: ref.bib
 ---
 
@@ -41,13 +43,13 @@ opts_chunk$set(fig.asp=1)
 
 # Introduction
 
-Chromatin immunoprecipitation with sequencing (ChIP-seq) is a popular technique for identifying the genomic binding sites of a target protein.
+Chromatin immunoprecipitation with sequencing (ChIP-seq) is a widely used technique for identifying the genomic binding sites of a target protein.
 Conventional analyses of ChIP-seq data aim to detect absolute binding (i.e., the presence or absence of a binding site) based on peaks in the read coverage.
-However, a number of recent studies have focused on the detection of changes in the binding profile between conditions [@rossinnes2012differential; @pal2013global].
-These differential binding (DB) analyses involve counting reads into genomic intervals, and then testing those counts for significant differences between conditions.
+An alternative analysis strategy is to detect of changes in the binding profile between conditions [@rossinnes2012differential; @pal2013global].
+These differential binding (DB) analyses involve counting reads into genomic intervals and testing those counts for significant differences between conditions.
 This defines a set of putative DB regions for further examination.
-DB analyses are easier to perform than their conventional counterparts,
-   as the effect of genomic biases is largely mitigated when counts for different libraries are compared at the same genomic region.
+DB analyses are statistically easier to perform than their conventional counterparts,
+as the effect of genomic biases is largely mitigated when counts for different libraries are compared at the same genomic region.
 DB regions may also be more relevant as the change in binding can be associated with the biological difference between conditions.
 
 The key step in the DB analysis is the manner in which reads are counted.
@@ -56,38 +58,31 @@ This is simple but will not capture changes outside of those regions.
 In contrast, *de novo* analyses do not depend on pre-specified regions, instead using empirically defined peaks or sliding windows for read counting.
 Peak-based methods are implemented in the `r Biocpkg("DiffBind")` and `r Biocpkg("DBChIP")` software packages [@rossinnes2012differential; @liang2012detecting],
     which count reads into peak intervals that have been identified with software like MACS [@zhang2008macs].
-This requires some care to maintain statistical rigour, as peaks are called with the same data used to test for DB.
+This requires some care to maintain statistical rigour as peaks are called with the same data used to test for DB.
 Alternatively, window-based approaches count reads into sliding windows across the genome.
 This is a more direct strategy that avoids problems with data re-use and can provide increased DB detection power [@lun2014denovo].
 However, its correct implementation is not straightforward due to the subtleties with interpretation of the false discovery rate (FDR).
 
-Here, we describe a computational workflow for performing a DB analysis with sliding windows.
+# Differential binding with sliding windows
+
+Here, we describe computational workflows for performing a DB analysis with sliding windows.
 It is primarily based on the `r Biocpkg("csaw")` software package but also uses a number of other packages from the open-source Bioconductor project [@huber2015orchestrating].
 The aim is to facilitate the practical implementation of window-based DB analyses by providing detailed code and expected output.
-The workflow described here applies to any ChIP-seq experiment with multiple experimental conditions and with multiple biological samples within one or more of the conditions.
-It detects and summarizes DB regions between conditions in a *de novo* manner, i.e., without making any prior assumptions about the location or width of bound regions.
+We demonstrate on data from real studies examining changes in transcription factor binding [@kasper2014genomewide] and histone mark enrichment [@domingo2012bcell].
+
+The workflows described here apply to any ChIP-seq experiment with multiple experimental conditions and with multiple biological samples within one or more of the conditions.
+They detect and summarize DB regions between conditions in a *de novo* manner, i.e., without making any prior assumptions about the location or width of bound regions.
 Detected regions are then annotated according to their proximity to annotated genes.
 In addition, the code can be easily adapted to accommodate batch effects, covariates and multiple experimental factors.
 
 ***Note:*** *to cite this article, please refer to https://f1000research.com/articles/4-1080/v2 for instructions.*
 
-# Links to individual workflows
-
-We use two datasets to demonstrate the application of sliding windows to detect DB events:
-
-- The first dataset studies changes in H3K9ac marking between pro-B and mature B cells [@domingo2012bcell].
-The DB workflow for this dataset can be found at https://bioconductor.org/help/workflows/h3k9ac/.
-- The second dataset studies changes in CREB-binding protein (CBP) binding between wild-type and CBP knock-out cells [@kasper2014genomewide].
-The DB workflow for this dataset can be found at https://bioconductor.org/help/workflows/cbp/.
-
-<!--
 # Obtaining BAM files
 
-All workflows start from sorted and indexed BAM files.
-This means that the raw read sequences have to be aligned to the genome beforehand.
-Most aligners can be used for this purpose; we have used `r Biocpkg("Rsubread")` [@liao2013subread] due to the convenience of its R interface.
-It is also recommended to mark duplicate reads using tools like _Picard_ prior to starting the workflow.
--->
+All of the workflows described here start from sorted and indexed BAM files in the `r Biocpkg("chipseqDBData")` package.
+For application to user-specified data, the raw read sequences have to be aligned to the appropriate reference genome beforehand.
+Most aligners can be used for this purpose, but we have used `r Biocpkg("Rsubread")` [@liao2013subread] due to the convenience of its R interface.
+It is also recommended to mark duplicate reads using tools like `Picard` prior to starting the workflow.
 
 # Author information
 
