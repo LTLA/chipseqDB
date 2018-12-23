@@ -314,7 +314,10 @@ The NB dispersion parameter allows modelling of biological variability between r
 GLMs can also accommodate complex experimental designs, though a simple design is sufficient for this study.
 
 ```{r}
-celltype <- sub(" .*", "", acdata$Description)
+celltype <- acdata$Description
+celltype[grep("pro", celltype)] <- "proB"
+celltype[grep("mature", celltype)] <- "matureB"
+
 celltype <- factor(celltype)
 design <- model.matrix(~0+celltype)
 colnames(design) <- levels(celltype)
