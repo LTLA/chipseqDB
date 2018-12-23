@@ -19,10 +19,6 @@ output:
 bibliography: ref.bib
 ---
 
-<!--
-****
--->
-
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
@@ -32,134 +28,34 @@ opts_chunk$set(fig.asp=1)
 
 # Overview
 
-Here, we perform a window-based DB analysis to identify regions of differential H3K9ac enrichment between pro-B and mature B cells [@domingo2012bcell].
+Here, we perform a window-based differential binding (DB) analysis to identify regions of differential H3K9ac enrichment between pro-B and mature B cells [@domingo2012bcell].
 H3K9ac is associated with active promoters and tends to exhibit relatively narrow regions of enrichment relative to other marks such as H3K27me3.
+We download the BAM files using the relevant function from the `r Biocpkg("chipseqDBData")` package^[BAM files are cached upon the first call to this function, so subsequent calls do not need to re-download the files.].
 The experimental design contains two biological replicates for each of the two cell types.
 
-# Aligning reads in the H3K9ac libraries
-
-The first task is to download the relevant ChIP-seq libraries from the NCBI Gene Expression Omnibus (GEO) [@edgar2002geo].
-These files are obtained from the data series GSE38046, using the Sequence Read Accession (SRA) numbers listed below.
-Multiple technical replicates exist for some of the biological replicates, and are indicated as those files with the same `grouping`.
-
 ```{r}
-sra.numbers <- c("SRR499718", "SRR499719", "SRR499720", "SRR499721",
-    "SRR499734", "SRR499735", "SRR499736", "SRR499737", "SRR499738")
-grouping <- c("proB-8113", "proB-8113", "proB-8108", "proB-8108",
-    "matureB-8059", "matureB-8059", "matureB-8059", "matureB-8059", "matureB-8086")
-all.sra <- paste0(sra.numbers, ".lite.sra")
-data.frame(SRA=all.sra, Condition=grouping)
+library(chipseqDBData)
+acdata <- H3K9acData()
+acdata
 ```
 
-These files are downloaded in the SRA format, and need to be unpacked to the FASTQ format prior to alignment.
-This can be done using the `fastq-dump` utility from the [SRA Toolkit](http://www.ncbi.nlm.nih.gov/Traces/sra/?view=software).
+# Pre-processing checks 
 
-```{r, echo=FALSE, results="hide"}
-remap <- FALSE
-redownload <- any(!file.exists(paste0(grouping, ".bam")))
-```
+## Examining mapping statistics
 
-```{r, eval=remap}
-for (sra in all.sra) {
-    code <- system(paste("fastq-dump", sra))
-    stopifnot(code==0L)
-}
-all.fastq <- paste0(sra.numbers, ".fastq")
-```
-
-Reads from technical replicates are pooled together into a single FASTQ file prior to further processing.
-This reflects the fact that they originate from a single library of DNA fragments.
-
-```{r, eval=remap}
-by.group <- split(all.fastq, grouping)
-for (group in names(by.group)) {
-    code <- system(paste(c("cat", by.group[[group]], ">",
-        paste0(group, ".fastq")), collapse=" "))
-    stopifnot(code==0L)
-}
-group.fastq <- paste0(names(by.group), ".fastq")
-```
-
-Reads in each library are aligned to the mm10 build of the mouse genome, using the `align` function in the `r Biocpkg("Rsubread")` package [@liao2013subread].
-This assumes that an index has already been constructed with the prefix `index/mm10`.
-The function uses a seed-and-vote paradigm to quickly and accurately map reads to the genome by focusing on locations that receive a number of votes above some consensus threshold.
-Here, a threshold of 2 votes is used instead of the default of 3, to accommodate the short length of the reads (32--36 bp).
-The `type` parameter is also set to optimize for genomic alignment, rather than alignment to the transcriptome.
-
-```{r, results="hide", eval=remap, message=FALSE}
-library(Rsubread)
-bam.files <- paste0(names(by.group), ".bam")
-align(index="index/mm10", readfile1=group.fastq, TH1=2, type=1,
-    input_format="FASTQ", output_file=bam.files)
-```
-
-In each of the resulting BAM files, alignments are re-sorted by their mapping locations.
-This is required for input into `r Biocpkg("csaw")`,
-    but is also useful for other programs like genome browsers that depend on sorting and indexing for rapid retrieval of reads.
-
-```{r, message=FALSE, results="hide", eval=remap}
-library(Rsamtools)
-for (bam in bam.files) {
-    out <- suppressWarnings(sortBam(bam, "h3k9ac_temp"))
-    file.rename(out, bam)
-}
-```
-
-Potential PCR duplicates are marked using the `MarkDuplicates` tool from the [Picard software suite](http://broadinstitute.github.io/picard).
-These are identified as alignments at the same genomic location, such that they may have originated from PCR-amplified copies of the same DNA fragment.
-
-```{r killindex, echo=FALSE, results="hide", message=FALSE, eval=remap}
-# For some reason, MarkDuplicates uses BAM index files if they're available; but we don't
-# want it using old indices, so we delete them beforehand if any are present.
-indices <- paste0(bam.files, ".bai")
-exist.indices <- file.exists(indices)
-if (any(exist.indices)) { unlink(indices[exist.indices]) }
-```
-
-```{r, eval=remap}
-temp.bam <- "h3k9ac_temp.bam"
-temp.file <- "h3k9ac_metric.txt"
-temp.dir <- "h3k9ac_working"
-dir.create(temp.dir)
-for (bam in bam.files) {
-    code <- system(sprintf("MarkDuplicates I=%s O=%s M=%s \\
-        TMP_DIR=%s AS=true REMOVE_DUPLICATES=false \\
-        VALIDATION_STRINGENCY=SILENT", bam, temp.bam,   
-        temp.file, temp.dir))
-    stopifnot(code==0L)
-    file.rename(temp.bam, bam)
-}
-```
-
-The behaviour of the alignment pipeline for this data set is easily summarized with some statistics.
+We use methods from the `r Biocpkg("Rsamtools")` package to compute some mapping statistics for each BAM file.
 Ideally, the proportion of mapped reads should be high (70-80% or higher), while the proportion of marked reads should be low (below 20%).
-Note that only reads with unique mapping locations are reported by `r Biocpkg("Rsubread")` as being successfully mapped.
-
-```{r, eval=!remap, results="hide", echo=FALSE, message=FALSE}
-library(Rsubread)
-library(Rsamtools)
-by.group <- split(all.sra, grouping)
-bam.files <- paste0(names(by.group), ".bam")
-```
-
-```{r, eval=redownload, results="hide", echo=FALSE, message=FALSE}
-core.loc <- "http://s3.amazonaws.com/chipseqdb-bamfiles/"
-for (bam in bam.files) { # Downloading all files.
-    bam.url <- paste0(core.loc, bam)
-    download.file(bam.url, bam)
-    download.file(paste0(bam.url, ".bai"), paste0(bam, ".bai"))
-}
-```
 
 ```{r mapstat}
+library(Rsamtools)
 diagnostics <- list()
-for (bam in bam.files) {
+for (bam in acdata$Path) {
     total <- countBam(bam)$records
     mapped <- countBam(bam, param=ScanBamParam(
         flag=scanBamFlag(isUnmapped=FALSE)))$records
     marked <- countBam(bam, param=ScanBamParam(
         flag=scanBamFlag(isUnmapped=FALSE, isDuplicate=TRUE)))$records
-    diagnostics[[bam]] <- c(Total=total, Mapped=mapped, Marked=marked)
+    diagnostics[[basename(bam)]] <- c(Total=total, Mapped=mapped, Marked=marked)
 }
 diag.stats <- data.frame(do.call(rbind, diagnostics))
 diag.stats$Prop.mapped <- diag.stats$Mapped/diag.stats$Total*100
@@ -167,14 +63,7 @@ diag.stats$Prop.marked <- diag.stats$Marked/diag.stats$Mapped*100
 diag.stats
 ```
 
-Finally, the libraries are indexed for rapid retrieval by genomic location.
-This generates a number of index files at the same location as the BAM files.
-
-```{r, eval=remap, results = 'hide'}
-indexBam(bam.files)
-```
-
-# Obtaining the ENCODE blacklist for mm10
+## Obtaining the ENCODE blacklist for mm10
 
 A number of genomic regions contain high artifactual signal in ChIP-seq experiments.
 These often correspond to genomic features like telomeres or microsatellite repeats.
@@ -183,54 +72,50 @@ Alignment of all (non-specifically immunoprecipitated) reads from the former wil
 Moreover, differences in repeat copy numbers between conditions can lead to detection of spurious DB.
 
 As such, these problematic regions must be removed prior to further analysis.
-This is done with an annotated blacklist for the [mm10 build of the mouse genome](http://www.broadinstitute.org/~anshul/projects/mouse/blacklist/mm10-blacklist.bed.gz).
-Genomic intervals in the blacklist are loaded to memory using the `import` method from the `r Biocpkg("rtracklayer")` package.
-All reads mapped to those intervals will be ignored during processing in `r Biocpkg("csaw")`.
-The blacklist itself was constructed by identifying consistently problematic regions in the ENCODE and modENCODE data sets [@encode2012encode].
+This is done with an annotated blacklist for the mm10 build of the mouse genome, 
+constructed by identifying consistently problematic regions from ENCODE datasets [@encode2012encode].
+We download this BED file and save it into a local cache with the `r Biocpkg("BiocFileCache")` package.
+This allows it to be used again in later workflows without requiring a new download.
 
-```{r, eval=redownload, message=FALSE, echo=FALSE, results="hide"}
-bed.file <- "mm10.blacklist.bed.gz"
-download.file(paste0(core.loc, bed.file), bed.file)
+```{r}
+library(BiocFileCache)
+bfc <- BiocFileCache("local")
+black.path <- bfcrpath(bfc, file.path("https://www.encodeproject.org",
+    "files/ENCFF419RSJ/@@download/ENCFF419RSJ.bed.gz"))
 ```
 
-```{r, message=FALSE}
+Genomic intervals in the blacklist are loaded to memory using the `import()` method from the `r Biocpkg("rtracklayer")` package.
+All reads mapped to those intervals will be ignored during processing in `r Biocpkg("csaw")` by specifying the `discard=` parameter (see below).
+
+```{r}
 library(rtracklayer)
-blacklist <- import("mm10.blacklist.bed.gz")
+blacklist <- import(black.path)
 blacklist
 ```
 
 Any user-defined set of regions can be used as a blacklist in this analysis.
-For example, one could use predicted repeat regions from the UCSC genome annotation [@rosenbloom2015ucsc].
+
+- For example, one could use predicted repeat regions from the UCSC genome annotation [@rosenbloom2015ucsc].
 This tends to remove a greater number of problematic regions (especially microsatellites) compared to the ENCODE blacklist.
 However, the size of the UCSC list means that genuine DB sites may also be removed.
 Thus, the ENCODE blacklist is preferred for most applications.
-Alternatively, if negative control libraries are available, they can be used to empirically identify problematic regions with the `r Biocpkg("GreyListChIP")` package.
+- Alternatively, if negative control libraries are available, they can be used to empirically identify problematic regions with the `r Biocpkg("GreyListChIP")` package.
 These regions should be ignored as they have high coverage in the controls and are unlikely to be genuine binding sites.
 
-## Setting up the analysis parameters
-
-Here, the settings for the DB analysis are specified.
-Recall that the paths to the BAM files are stored in the `bam.files` vector after alignment.
-The cell type for each file is conveniently extracted from the file name.
-
-```{r}
-celltype <- sub("-.*", "", bam.files)
-data.frame(BAM=bam.files, CellType=celltype)
-```
+## Setting up the read extraction parameters
 
 In the `r Biocpkg("csaw")` package, the `readParam` object determines which reads are extracted from the BAM files.
 The idea is to set this up once and to re-use it in all relevant functions.
-For this analysis, reads are ignored if they map to blacklist regions or do not map to the standard set of mouse nuclear chromosomes.
+For this analysis, reads are ignored if they map to blacklist regions or do not map to the standard set of mouse nuclear chromosomes^[In this case, we are not interested in the mitochondrial genome, as these should not be bound by histones anyway.].
 
 ```{r, message=FALSE}
 library(csaw)
 standard.chr <- paste0("chr", c(1:19, "X", "Y"))
-param <- readParam(minq=50, discard=blacklist, restrict=standard.chr)
+param <- readParam(minq=10, discard=blacklist, restrict=standard.chr)
 ```
 
-Reads are also ignored if they have a mapping quality (MAPQ) score below 50.
-This avoids spurious results due to weak or non-unique alignments.
-While a MAPQ threshold of 50 is conservative, a stringent threshold is necessary here due to the short length of the reads.
+Reads are also ignored if they have a mapping quality (MAPQ) score below 10.
+This avoids spurious results due to weak or non-unique alignments that should be assigned low MAPQ scores by the aligner.
 Note that the range of MAPQ scores will vary between aligners, so some inspection of the BAM files is necessary to choose an appropriate value.
 
 # Computing the average fragment length
@@ -261,13 +146,57 @@ Thus, the marking status of each read will be ignored in the rest of the analysi
 
 # Counting reads into windows
 
-`r Biocpkg("csaw")` uses a sliding window strategy to quantify binding intensity across the genome.
-Each read is directionally extended to the average fragment length, to represent the DNA fragment from which that read was sequenced.
-The number of extended reads overlapping a window is counted.
-The window is then moved to its next position on the genome, and counting is repeated.
-(Each read is usually counted into multiple windows, which will introduce correlations between adjacent windows but will not otherwise affect the analysis.)
+`r Biocpkg("csaw")` uses a sliding window strategy to quantify protein binding intensity across the genome.
+Each read is directionally extended to the average fragment length (Figure \@ref(fig:directional)) to represent the DNA fragment from which that read was sequenced.
+Any position within the inferred fragment is a potential contact site for the protein of interest.
+To quantify binding in a genomic window, the number of these fragments overlapping the window is counted.
+The window is then moved to its next position on the genome and counting is repeated^[Each read is usually counted into multiple windows, which will introduce correlations between adjacent windows but will not otherwise affect the analysis.].
 This is done for all libraries such that a count is obtained for each window in each library.
-The `windowCounts` function produces a `RangedSummarizedExperiment` object containing these counts in matrix form, where each row corresponds to a window and each column represents a library.
+
+```{r directional, echo=FALSE, fig.asp=0.4, fig.wide=TRUE, fig.cap="Directional extension of reads by the average fragment length `ext` in single-end ChIP-seq data. Each extended read represents an imputed fragment, and the number of fragments overlapping a window of a given `width` is counted."}
+par(mar=c(0,0,0,0), cex=1.2)
+plot(0,0,xlim=c(-2, 12), ylim=c(-1, 3.5), type="n", axes=FALSE, xlab="", ylab="", xpd=TRUE)
+
+# Filling the left region.
+rect(0, 0, 10, 1, col="grey")
+lines(c(0, 0, 10, 10), 
+    c(-.1, -.5, -.5, -.1))
+lines(c(5, 5),
+    c(-.5, -.7))
+text(5, -.7, "width",pos=1)
+
+# Adding the left read.
+lines(c(-2, 2.5), 
+    c(1.5, 1.5), 
+    col=rgb(1, 0.7, 0.7), lwd=5)
+lines(c(-2, -0.5, -0.8),
+    c(1.5, 1.5, 1.8),
+    col="red", lwd=5)
+lines(c(-2, -2, 2.5, 2.5),
+    c(1.8, 2, 2, 1.8))
+text(-2, 1.45, "forward\nread", pos=1)
+
+# Adding the right read.
+lines(c(12, 7.5),
+    c(1.8, 1.8),
+    col=rgb(0.7, 0.7, 1), lwd=5)
+lines(c(12, 10.5, 10.8),
+    c(1.8, 1.8, 2.1),
+    col="blue", lwd=5)
+lines(c(12, 12, 7.5, 7.5),
+    c(2.1, 2.3, 2.3, 2.1))
+text(12, 1.75, "reverse\nread", pos=1)
+
+# Describing the extension.
+lines(c(0, 0, 3.1),
+    c(2, 2.8, 2.8))
+lines(c(10, 10, 6.9),
+    c(2.3, 2.8, 2.8))
+text(5, 2.8, "fragment length (ext)")
+```
+
+The `windowCounts()` function produces a `RangedSummarizedExperiment` object containing these counts in matrix form.
+Each row corresponds to a window and each column represents a library.
 
 ```{r}
 win.data <- windowCounts(bam.files, param=param, width=150, ext=frag.len)
@@ -282,17 +211,17 @@ This is unnecessary as increased resolution confers little practical benefit for
 Finally, windows with very low counts (by default, less than a sum of 10 across all libraries) are removed to reduce memory usage.
 This represents a preliminary filter to remove uninteresting windows corresponding to likely background regions.
 
-## Filtering windows by abundance
+# Filtering windows by abundance
 
 As previously mentioned, low-abundance windows contain no binding sites and need to be filtered out.
 This improves power by removing irrelevant tests prior to the multiple testing correction;
-    avoids problems with discreteness in downstream statistical methods;
-    and reduces computational work for further analyses.
+avoids problems with discreteness in downstream statistical methods;
+and reduces computational work for further analyses.
 Here, filtering is performed using the average abundance of each window [@mccarthy2012differential], which is defined as the average log-count per million for that window.
 This performs well as an independent filter statistic for NB-distributed count data [@lun2014denovo].
 
 The filter threshold is defined based on the assumption that most regions in the genome are not marked by H3K9ac.
-Reads are counted into large bins and the median coverage across those bins is used as an estimate of the background abundance.
+Reads are counted into large bins and the median coverage across those bins is used as an estimate of the background abundance^[Large bins are necessary to obtain a precise estimate of background coverage, which would otherwise be too low in individual windows.].
 This estimate is then compared to the average abundances of the windows, after rescaling to account for differences in the window and bin sizes.
 A window is only retained if its coverage is 3-fold higher than that of the background regions,
     i.e., the abundance of the window is greater than the background abundance estimate by log~2~(3) or more.
@@ -347,7 +276,7 @@ Rather, non-linear normalization methods must be used.
 This produces a matrix of offsets that can be used during GLM fitting.
 
 ```{r}
-filtered.data <- normOffsets(filtered.data, type="loess")
+filtered.data <- normOffsets(filtered.data)
 offsets <- assay(filtered.data, "offset")
 head(offsets)
 ```
@@ -377,12 +306,13 @@ An alternative normalization strategy for these situations will be described lat
 
 ## Introduction
 
-Counts are modelled using NB GLMs in the `r Biocpkg("edgeR")` package [@mccarthy2012differential; @robinson2010edger].
+Counts are modelled using negative binomial generalized linear models (NB GLMs) in the `r Biocpkg("edgeR")` package [@mccarthy2012differential; @robinson2010edger].
 The NB distribution is useful as it can handle low, discrete counts for each window.
 The NB dispersion parameter allows modelling of biological variability between replicate libraries.
 GLMs can also accommodate complex experimental designs, though a simple design is sufficient for this study.
 
 ```{r}
+celltype <- sub(" .*", "", acdata$Description)
 celltype <- factor(celltype)
 design <- model.matrix(~0+celltype)
 colnames(design) <- levels(celltype)
@@ -403,6 +333,7 @@ This means that empirical mean-dispersion trends can be flexibly modelled.
 ```{r}
 library(edgeR)
 y <- asDGEList(filtered.data)
+str(y)
 y <- estimateDisp(y, design)
 summary(y$trended.dispersion)
 ```
@@ -523,7 +454,7 @@ Otherwise, the reported direction is the same as that of the windows, i.e., `"up
 table(tabcom$direction[is.sig])
 ```
 
-Another approach is to use the log-fold change of the most significant window (identified with the `getBestTest` function) as a proxy for the log-fold change of the cluster.
+Another approach is to use the log-fold change of the most significant window (identified with the `getBestTest()` function) as a proxy for the log-fold change of the cluster.
 
 ```{r}
 tabbest <- getBestTest(merged$id, res$table)
@@ -540,7 +471,7 @@ is.sig.pos <- (tabbest$logFC > 0)[is.sig]
 summary(is.sig.pos)
 ```
 
-This approach is generally satisfactory, though it will not capture multiple changes in opposite directions.
+This approach is generally satisfactory, though it will not capture multiple changes in opposite directions^[Try `mixedClusters()` to formally detect clusters that contain significant changes in both directions.].
 It also tends to overstate the change in each cluster.
 
 # Saving results to file
@@ -552,7 +483,7 @@ The updated `GRanges` object is then saved to file as a serialized R object with
 
 ```{r}
 out.ranges <- merged$region
-elementMetadata(out.ranges) <- data.frame(tabcom,
+mcols(out.ranges) <- data.frame(tabcom,
     best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
     best.logFC=tabbest$logFC)
 saveRDS(file="h3k9ac_results.rds", out.ranges)
@@ -569,10 +500,9 @@ export(con="h3k9ac_results.bed", object=simplified)
 
 Saving the `RangedSummarizedExperiment` objects is also recommended.
 This avoids the need to re-run the time-consuming read counting steps if parts of the analysis need to be repeated.
-Similarly, the `DGEList` object is saved so that the `r Biocpkg("edgeR")` statistics can be easily recovered.
 
 ```{r}
-save(file="h3k9ac_objects.Rda", win.data, bins, y)
+save(file="h3k9ac_objects.Rda", win.data, bins)
 ```
 
 # Interpreting the DB results
@@ -583,10 +513,8 @@ save(file="h3k9ac_objects.Rda", win.data, bins, y)
 
 `r Biocpkg("csaw")` provides its own annotation function, `detailRanges`.
 This identifies all genic features overlapping each region and reports them in a compact string form.
-Briefly, features are reported as `SYMBOL|EXONS|STRAND` where `SYMBOL` represents the gene symbol,
-    `EXONS` lists the overlapping exons (`0` for promoters, `I` for introns),
-    and `STRAND` reports the strand.
-Multiple overlapping features for different genes are separated by commas within the string for each region.
+Briefly, features are reported as `SYMBOL:STRAND:TYPE` where `SYMBOL` represents the gene symbol;
+`STRAND` reports the strand of the gene; and `TYPE` reports the type(s) of overlapped feature, e.g., `E` for exons, `P` for promoters, `I` for introns^[Introns are only reported if an exon is not overlapped.].
 
 ```{r, message=FALSE}
 library(org.Mm.eg.db)
@@ -597,8 +525,7 @@ head(anno$overlap)
 ```
 
 Annotated features that flank the region of interest are also reported.
-The description for each feature is formatted as described above but with an extra `[DISTANCE]` field,
-    representing the distance (in base pairs) between that feature and the region.
+The description for each feature is formatted as described above but the `TYPE` instead represents the distance (in base pairs) between the closest exon of the gene and the region.
 By default, only flanking features within 5 kbp of each region are considered.
 
 ```{r}
@@ -610,8 +537,8 @@ The annotation for each region is stored in the metadata of the `GRanges` object
 The compact string form is useful for human interpretation, as it allows rapid examination of all genic features neighbouring each region.
 
 ```{r}
-meta <- elementMetadata(out.ranges)
-elementMetadata(out.ranges) <- data.frame(meta, anno)
+meta <- mcols(out.ranges)
+mcols(out.ranges) <- data.frame(meta, anno)
 ```
 
 ### Using the `r Biocpkg("ChIPpeakAnno")` package
@@ -632,13 +559,13 @@ colnames(elementMetadata(anno.regions))
 
 Alternatively, identification of all overlapping features within, say, 5 kbp can be achieved by setting `maxgap=5000` and `output="overlapping"` in `annotatePeakInBatch`.
 This will report each overlapping feature in a separate entry of the returned `GRanges` object, i.e., each input region may have multiple output values.
-In contrast, `detailRanges` will report all overlapping features for a region as a single string, i.e., each input region has one output value.
-Which is preferable depends on the purpose of the annotation -- the `detailRanges` output is more convenient for direct annotation of a DB list, while the `annotatePeakInBatch` output contains more information and is more convenient for further manipulation.
+In contrast, `detailRanges()` will report all overlapping features for a region as a single string, i.e., each input region has one output value.
+Which is preferable depends on the purpose of the annotation -- the `detailRanges()` output is more convenient for direct annotation of a DB list, while the `annotatePeakInBatch()` output contains more information and is more convenient for further manipulation.
 
 ## Reporting gene-based results
 
-Another approach to annotation is to flip the problem around, such that DB statistics are reported directly for features of interest like genes.
-This is more convenient when the DB analysis needs to be integrated with, e.g., DE analyses of matching RNA-seq data.
+Another approach to annotation is to flip the problem around such that DB statistics are reported directly for features of interest like genes.
+This is more convenient when the DB analysis needs to be integrated with, e.g., differential expression analyses of matched RNA-seq data.
 In the code below, promoter coordinates and gene symbols are obtained from various annotation objects.
 
 ```{r}
@@ -650,9 +577,10 @@ prom$gene_name <- gene.name$SYMBOL[match(entrez.ids, gene.name$ENTREZID)]
 head(prom)
 ```
 
-All windows overlapping each promoter are defined as a cluster, and DB statistics are computed as previously described for each cluster/promoter.
+All windows overlapping each promoter are defined as a cluster.
+DB statistics are computed for each cluster/promoter with the `combineOverlaps()` function, which behaves like the `combineTests()` function for `Hits` input objects.
 This directly yields DB results for the annotated features.
-Promoters with no overlapping windows are assigned `NA` values for the various fields, and are filtered out below for demonstration purposes.
+Promoters with no overlapping windows are assigned `NA` values for the various fields and are filtered out below for demonstration purposes.
 
 ```{r}
 olap <- findOverlaps(prom, rowRanges(filtered.data))
@@ -799,8 +727,7 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
 
 Note that the window size will determine whether sharp or broad events are preferentially detected.
 Larger windows provide more power to detect broad events (as the counts are higher), while smaller windows provide more resolution to detect sharp events.
-Optimal detection of all features can be obtained by performing analyses with multiple window sizes and consolidating the results,
-    though -- for brevity -- this will not be described here.
+Optimal detection of all features can be obtained by performing analyses with multiple window sizes and consolidating the results^[See `?consolidateWindows` and `?consolidateTests` for further information.], though -- for brevity -- this will not be described here.
 In general, smaller window sizes are preferred as strong DB events with sufficient coverage will always be detected.
 For larger windows, detection may be confounded by other events within the window that distort the log-fold change in the counts between conditions.
 
