@@ -11,11 +11,13 @@ author:
     - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
 date: "`r Sys.Date()`"
 vignette: >
-  %\VignetteIndexEntry{Detecting differential enrichment of H3K9ac in murine B cells}
+  %\VignetteIndexEntry{2. Differential enrichment of H3K9ac in B cells}
   %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 output:
-    BiocStyle::html_document:
-        fig_caption: yes
+  BiocStyle::html_document:
+    fig_caption: yes
+    toc_float: yes
 bibliography: ref.bib
 ---
 
