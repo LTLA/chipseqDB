@@ -1,7 +1,7 @@
 Package: chipseqDB
 Title: From reads to regions: a Bioconductor workflow to detect differential binding in ChIP-seq data
-Version: 1.3.3
-Date: 2018-10-09
+Version: 1.3.4
+Date: 2019-01-07
 Authors@R: c(person(role=c("aut","cre"), "Aaron", "Lun", email = "infinite.monkeys.with.keyboards@gmail.com"),
         person(role="aut", "Gordon ", "Smyth"))
 Description: Describes a computational workflow for performing a DB analysis with sliding windows.
@@ -15,7 +15,6 @@ Depends: R (>= 3.3.0),
         ChIPpeakAnno,
         Gviz,
         Rsamtools,
-        Rsubread,
         TxDb.Mmusculus.UCSC.mm10.knownGene,
         csaw,
         edgeR,
