@@ -69,7 +69,7 @@ The ENCODE blacklist is again used^[Assuming you ran the previous workflow, this
 
 ```{r}
 library(BiocFileCache)
-bfc <- BiocFileCache("local")
+bfc <- BiocFileCache("local", ask=FALSE)
 black.path <- bfcrpath(bfc, file.path("https://www.encodeproject.org",
     "files/ENCFF419RSJ/@@download/ENCFF419RSJ.bed.gz"))
 
@@ -92,7 +92,7 @@ Generally, cross-correlations for TF datasets are sharper than for histone marks
 This results in more pronounced strand bimodality in the binding profile.
 
 ```{r}
-x <- correlateReads(bam.files, param=reform(param, dedup=TRUE))
+x <- correlateReads(cbpdata$Path, param=reform(param, dedup=TRUE))
 frag.len <- maximizeCcf(x)
 frag.len
 ```
@@ -111,7 +111,7 @@ A large window size will be suboptimal as the count for a particular site will b
 In this case, a window size of 10 bp is used.
 
 ```{r}
-win.data <- windowCounts(bam.files, param=param, width=10, ext=frag.len)
+win.data <- windowCounts(cbpdata$Path, param=param, width=10, ext=frag.len)
 win.data
 ```
 
@@ -132,7 +132,7 @@ Specifically, the trimmed mean of M-values (TMM) method [@robinson2010scaling] i
 These factors are stored in `win.data`^[See the `se.out=` argument.] so that they will be applied during the DB analysis with the window counts.
 
 ```{r}
-bins <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+bins <- windowCounts(cbpdata$Path, bin=TRUE, width=10000, param=param)
 win.data <- normFactors(bins, se.out=win.data)
 (normfacs <- win.data$norm.factors)
 ```
@@ -330,12 +330,12 @@ library(Gviz)
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 
-for (i in seq_along(bam.files)) {
-    reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
+for (i in seq_along(cbpdata$Path)) {
+    reads <- extractReads(bam.file=cbpdata$Path[i], cur.region, param=param)
     pcov <- as(coverage(reads[strand(reads)=="+"])/lib.sizes[i], "GRanges")
     ncov <- as(coverage(reads[strand(reads)=="-"])/-lib.sizes[i], "GRanges")
     ptrack <- DataTrack(pcov, type="histogram", lwd=0, ylim=c(-5, 5),
-        name=bam.files[i], col.axis="black", col.title="black",
+        name=cbpdata$Description[i], col.axis="black", col.title="black",
         fill="blue", col.histogram=NA)
     ntrack <- DataTrack(ncov, type="histogram", lwd=0, ylim=c(-5, 5),
         fill="red", col.histogram=NA)
