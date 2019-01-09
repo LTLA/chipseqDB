@@ -27,7 +27,7 @@ License: Artistic-2.0
 Encoding: UTF-8
 LazyData: true
 VignetteBuilder: knitr
-biocViews: Workflow, EpigeneticsWorkflow
+biocViews: ImmunoOncologyWorkflow, Workflow, EpigeneticsWorkflow
 Workflow: true
 Suggests: knitr, rmarkdown
 NeedsCompilation: no
