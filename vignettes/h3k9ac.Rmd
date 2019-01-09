@@ -16,8 +16,8 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 output:
   BiocStyle::html_document:
-    fig_caption: yes
     toc_float: yes
+    titlecaps: false
 bibliography: ref.bib
 ---
 
@@ -81,9 +81,9 @@ This allows it to be used again in later workflows without requiring a new downl
 
 ```{r}
 library(BiocFileCache)
-bfc <- BiocFileCache("local")
+bfc <- BiocFileCache("local", ask=FALSE)
 black.path <- bfcrpath(bfc, file.path("https://www.encodeproject.org",
-    "files/ENCFF419RSJ/@@download/ENCFF419RSJ.bed.gz"))
+    "files/ENCFF547MET/@@download/ENCFF547MET.bed.gz"))
 ```
 
 Genomic intervals in the blacklist are loaded to memory using the `import()` method from the `r Biocpkg("rtracklayer")` package.
@@ -113,10 +113,10 @@ For this analysis, reads are ignored if they map to blacklist regions or do not 
 ```{r, message=FALSE}
 library(csaw)
 standard.chr <- paste0("chr", c(1:19, "X", "Y"))
-param <- readParam(minq=10, discard=blacklist, restrict=standard.chr)
+param <- readParam(minq=20, discard=blacklist, restrict=standard.chr)
 ```
 
-Reads are also ignored if they have a mapping quality (MAPQ) score below 10.
+Reads are also ignored if they have a mapping quality (MAPQ) score below 20^[This is more stringent than usual, to account for the fact that short reads (32-36 bp) are more difficult to accurately align.].
 This avoids spurious results due to weak or non-unique alignments that should be assigned low MAPQ scores by the aligner.
 Note that the range of MAPQ scores will vary between aligners, so some inspection of the BAM files is necessary to choose an appropriate value.
 
@@ -129,7 +129,7 @@ The delay distance at the peak corresponds to the distance between forward-/reve
 This is identified from Figure \@ref(fig:ccfplot) and is used as the average fragment length for this analysis.
 
 ```{r}
-x <- correlateReads(bam.files, param=reform(param, dedup=TRUE))
+x <- correlateReads(acdata$Path, param=reform(param, dedup=TRUE))
 frag.len <- maximizeCcf(x)
 frag.len
 ```
@@ -201,7 +201,7 @@ The `windowCounts()` function produces a `RangedSummarizedExperiment` object con
 Each row corresponds to a window and each column represents a library.
 
 ```{r}
-win.data <- windowCounts(bam.files, param=param, width=150, ext=frag.len)
+win.data <- windowCounts(acdata$Path, param=param, width=150, ext=frag.len)
 win.data
 ```
 
@@ -230,7 +230,7 @@ A window is only retained if its coverage is 3-fold higher than that of the back
 This removes a large number of windows that are weakly or not marked and are likely to be irrelevant.
 
 ```{r}
-bins <- windowCounts(bam.files, bin=TRUE, width=2000, param=param)
+bins <- windowCounts(acdata$Path, bin=TRUE, width=2000, param=param)
 filter.stat <- filterWindows(win.data, bins, type="global")
 min.fc <- 3
 keep <- filter.stat$filter > log2(min.fc)
@@ -263,7 +263,7 @@ This refers to a systematic fold-difference in window coverage between libraries
 ```{r trendplot, fig.cap="Abundance-dependent trend in the log-fold change between two H3K9ac libraries (mature B over pro-B), across all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
 win.ab <- scaledAverage(filtered.data)
 adjc <- calculateCPM(filtered.data, use.offsets=FALSE)
-logfc <- adjc[,1] - adjc[,4]
+logfc <- adjc[,4] - adjc[,1]
 smoothScatter(win.ab, logfc, ylim=c(-6, 6), xlim=c(0, 5),
     xlab="Average abundance", ylab="Log-fold change")
 
@@ -290,7 +290,7 @@ This indicates that normalization was successful in removing the differences bet
 
 ```{r normplot, fig.cap="Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Normalized log-fold changes are shown for all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
 norm.adjc <- calculateCPM(filtered.data, use.offsets=TRUE)
-norm.fc <- norm.adjc[,1]-norm.adjc[,4]
+norm.fc <- norm.adjc[,4]-norm.adjc[,1]
 smoothScatter(win.ab, norm.fc, ylim=c(-6, 6), xlim=c(0, 5),
     xlab="Average abundance", ylab="Log-fold change")
 
@@ -355,8 +355,8 @@ plotBCV(y)
 
 For most data sets, one would expect to see a trend that decreases to a plateau with increasing average abundance.
 This reflects the greater reliability of large counts, where the effects of stochasticity and technical artifacts (e.g., mapping errors, PCR duplicates) are averaged out.
-In Figure \@ref(fig:bcvplot), the range of abundances after filtering is such that the plateau has already been reached.
-This is still a satisfactory result, as it indicates that the retained windows have low variability and more power to detect DB.
+We observe no clear trend in Figure \@ref(fig:bcvplot) as the windows have already been filtered to the plateau.
+This is still a satisfactory result as it indicates that the retained windows have low variability and more power to detect DB.
 
 ## Estimating the QL dispersion
 
@@ -376,19 +376,20 @@ The extent of shrinkage is determined by the prior degrees of freedom (d.f.).
 Large prior d.f. indicates that the dispersions were similar across windows, such that strong shrinkage to the trend could be performed to increase stability and power.
 Small prior d.f. indicates that the dispersions were more variable.
 In such cases, less squeezing is performed as strong shrinkage would be inappropriate.
-Also note the use of `robust=TRUE`, which reduces the sensitivity of the EB procedures to outlier windows.
 
 ```{r}
 summary(fit$df.prior)
 ```
+
+Also note the use of `robust=TRUE` in the `glmQLFit()` call, which reduces the sensitivity of the EB procedures to outlier variances.
+This is particularly noticeable in Figure \@ref(fig:qlplot) with highly variable windows that (correctly) do not get squeezed towards the trend. 
 
 ## Examining the data with MDS plots
 
 Multi-dimensional scaling (MDS) plots are used to examine the similarities between libraries.
 The distance between a pair of libraries on this plot represents the overall log-fold change between those libraries.
 Ideally, replicates should cluster together while samples from different conditions should be separate.
-In Figure \@ref(fig:mdsplot), strong separation in the first dimension is observed between libraries from different cell types.
-This indicates that significant differences are likely to be present between cell types in this data set.
+Libraries from different cell types separate well in Figure \@ref(fig:mdsplot), indicating that significant differences are likely to be present between cell types.
 
 ```{r mdsplot, fig.cap="MDS plot with two dimensions for all libraries in the H3K9ac data set. Libraries are labelled and coloured according to the cell type."}
 plotMDS(norm.adjc, labels=celltype,
@@ -620,7 +621,7 @@ symbol(greg) <- symbols[gene(greg)]
 
 ## Simple DB across a broad region
 
-To begin with, the top-ranking DB region will be visualized.
+We start by visualizing one of the top-ranking DB regions.
 This represents a simple DB event where the entire region changes in one direction (Figure \@ref(fig:simplebroadplot)).
 Specifically, it represents an increase in H3K9ac marking at the *H2-Aa* locus.
 This is consistent with the expected biology --
@@ -629,13 +630,13 @@ This is consistent with the expected biology --
 
 ```{r}
 o <- order(out.ranges$PValue)
-cur.region <- out.ranges[o[1]]
+cur.region <- out.ranges[o[2]]
 cur.region
 ```
 
 ```{r, echo=FALSE, results="hide"}
-if (!overlapsAny(cur.region, GRanges("chr17", IRanges(34285101, 34289950)), type="equal")) {
-    warning("first region does not match expectations")
+if (cur.region!=GRanges("chr17", IRanges(34285101, 34289850))) {
+    stop("first region does not match expectations")
 }
 ```
 
@@ -646,11 +647,11 @@ This corrects for differences in library sizes between tracks.
 ```{r simplebroadplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a simple DB event between pro-B and mature B cells, across a broad region in the H3K9ac data set. Read coverage for each library is shown as a per-million value at each base."}
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
-for (i in 1:length(bam.files)) {
-    reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
+for (i in seq_along(acdata$Path)) {
+    reads <- extractReads(bam.file=acdata$Path[i], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
     collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,10),
-        name=bam.files[i], col.axis="black", col.title="black",
+        name=acdata$Description[i], col.axis="black", col.title="black",
         fill="darkgray", col.histogram=NA)
 }
 plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)),
@@ -671,8 +672,8 @@ cur.region
 ```
 
 ```{r, echo=FALSE, results="hide"}
-if (!overlapsAny(cur.region, GRanges("chr5", IRanges(122987201, 122991450)), type="equal")) {
-    warning("second region does not match expectations")
+if (cur.region!=GRanges("chr5", IRanges(122987201, 122991450))) {
+    stop("second region does not match expectations")
 }
 ```
 
@@ -682,11 +683,11 @@ This represents a complex DB event that would not be detected if reads were coun
 
 ```{r complexplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a complex DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
-for (i in 1:length(bam.files)) {
-    reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
+for (i in seq_along(acdata$Path)) {
+    reads <- extractReads(bam.file=acdata$Path[i], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
     collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3),
-        name=bam.files[i], col.axis="black", col.title="black",
+        name=acdata$Description[i], col.axis="black", col.title="black",
         fill="darkgray", col.histogram=NA)
 }
 plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)),
@@ -703,13 +704,13 @@ This is demonstrated by examining those clusters that contain a smaller number o
 
 ```{r}
 sharp <- out.ranges$nWindows < 20
-cur.region <- out.ranges[o[sharp[o]][1]]
+cur.region <- out.ranges[o[sharp[o]][2]]
 cur.region
 ```
 
 ```{r, echo=FALSE, results="hide"}
-if (!overlapsAny(cur.region, GRanges("chr16", IRanges(36665551, 36666200)), type="equal")) {
-    warning("second region does not match expectations")
+if (cur.region!=GRanges("chr16", IRanges(36665601, 36666200))) {
+    stop("second region does not match expectations")
 }
 ```
 
@@ -719,11 +720,11 @@ Again, this makes biological sense as CD86 is involved in regulating immunoglobu
 
 ```{r simplesharpplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a sharp and simple DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
-for (i in 1:length(bam.files)) {
-    reads <- extractReads(bam.file=bam.files[i], cur.region, param=param)
+for (i in seq_along(acdata$Path)) {
+    reads <- extractReads(bam.file=acdata$Path[i], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
     collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3),
-        name=bam.files[i], col.axis="black", col.title="black",
+        name=acdata$Description[i], col.axis="black", col.title="black",
         fill="darkgray", col.histogram=NA)
 }
 plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)),
