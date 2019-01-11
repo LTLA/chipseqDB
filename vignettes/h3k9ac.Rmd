@@ -619,23 +619,30 @@ symbols <- unlist(mapIds(org.Mm.eg.db, gene(greg), "SYMBOL",
 symbol(greg) <- symbols[gene(greg)]
 ```
 
+We will also sort the DB regions by p-value for easier identification of regions of interest.
+
+```{r}
+o <- order(out.ranges$PValue)
+sorted.ranges <- out.ranges[o]
+sort.ranges
+```
+
 ## Simple DB across a broad region
 
 We start by visualizing one of the top-ranking DB regions.
 This represents a simple DB event where the entire region changes in one direction (Figure \@ref(fig:simplebroadplot)).
-Specifically, it represents an increase in H3K9ac marking at the *H2-Aa* locus.
+Specifically, it represents an increase in H3K9ac marking at the *H2-Aa* locus in mature B cells.
 This is consistent with the expected biology --
     H3K9ac is a mark of active gene expression [@karmodiya2012h3k9]
     and MHCII components are upregulated in mature B cells [@hoffman2002changes].
 
 ```{r}
-o <- order(out.ranges$PValue)
-cur.region <- out.ranges[o[2]]
+cur.region <- sorted.ranges[1]
 cur.region
 ```
 
 ```{r, echo=FALSE, results="hide"}
-if (cur.region!=GRanges("chr17", IRanges(34285101, 34289850))) {
+if (cur.region!=GRanges("chr17", IRanges(34285101, 34290050))) {
     stop("first region does not match expectations")
 }
 ```
@@ -661,13 +668,12 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
 ## Complex DB across a broad region
 
 Complex DB refers to situations where multiple DB events are occurring within the same enriched region.
-These are identified as those clusters that contain windows changing in both directions.
-Here, the second-ranking complex cluster is selected for visualization
-    (the top-ranking complex cluster is adjacent to the region used in the previous example, so another region is chosen for some variety).
+These are identified as those clusters that contain windows changing in both directions^[Technically, we should use `mixedClusters()` for rigorous identification of regions with significant changes in both directions. However, for simplicity, we'll just use a more _ad hoc_ approach here.].
+Here, one of the top-ranking complex clusters is selected for visualization.
 
 ```{r}
-complex <- out.ranges$logFC.up > 0 & out.ranges$logFC.down > 0
-cur.region <- out.ranges[o[complex[o]][2]]
+complex <- sorted.ranges$logFC.up > 0 & sorted.ranges$logFC.down > 0
+cur.region <- sorted.ranges[complex][2]
 cur.region
 ```
 
@@ -703,13 +709,13 @@ However, H3K9ac marking can also be concentrated into small regions, involving o
 This is demonstrated by examining those clusters that contain a smaller number of windows.
 
 ```{r}
-sharp <- out.ranges$nWindows < 20
-cur.region <- out.ranges[o[sharp[o]][2]]
+sharp <- sorted.ranges$nWindows < 20
+cur.region <- sorted.ranges[sharp][1]
 cur.region
 ```
 
 ```{r, echo=FALSE, results="hide"}
-if (cur.region!=GRanges("chr16", IRanges(36665601, 36666200))) {
+if (cur.region!=GRanges("chr16", IRanges(36665551, 36666200))) {
     stop("second region does not match expectations")
 }
 ```
