@@ -624,7 +624,7 @@ We will also sort the DB regions by p-value for easier identification of regions
 ```{r}
 o <- order(out.ranges$PValue)
 sorted.ranges <- out.ranges[o]
-sort.ranges
+sorted.ranges
 ```
 
 ## Simple DB across a broad region
