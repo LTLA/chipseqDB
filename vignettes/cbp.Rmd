@@ -228,10 +228,9 @@ summary(fit$df.prior)
 plotQLDisp(fit)
 ```
 
-These statistics are consistent with the presence of a batch effect between replicates.
+These statistics are consistent with the presence of systematic differences in CBP enrichment between replicates.
 The dispersions for all windows are inflated to a similarly large value by the batch effect, resulting in low variability in the dispersions across windows.
 This is illustrated in Figure \@ref(fig:mdsplot) where the WT libraries are clearly separated in both dimensions of the MDS plot.
-Separation of replicates on the first dimension is indicative of a systematic difference of size comparable to that between genotypes.
 
 ```{r mdsplot, fig.cap="MDS plot with two dimensions for all libraries in the CBP data set. Libraries are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT libraries."}
 plotMDS(cpm(y, log=TRUE), top=10000, labels=genotype,
@@ -239,7 +238,8 @@ plotMDS(cpm(y, log=TRUE), top=10000, labels=genotype,
 ```
 
 The presence of a large batch effect between replicates is not ideal.
-Nonetheless, the DB analysis can proceed, albeit with some loss of power due to the inflated NB dispersions.
+Nonetheless, we can still proceed with the DB analysis - albeit with some loss of power due to the inflated NB dispersions - 
+given that there are strong differences between genotypes in Figure \@ref(fig:mdsplot),
 
 # Testing for DB
 
