@@ -9,8 +9,10 @@ Description: Describes a computational workflow for performing a DB analysis wit
         The workflow described here applies to any ChIP-seq experiment with multiple experimental conditions and multiple biological samples in one or more of the conditions.
         It detects and summarizes DB regions between conditions in a de novo manner, i.e., without making any prior assumptions about the location or width of bound regions.
         Detected regions are then annotated according to their proximity to genes.
-Depends: R (>= 3.3.0),
+Depends: R (>= 3.6)
+Suggests: chipseqDBData,
         BiocStyle,
+        BiocFileCache,
         ChIPpeakAnno,
         Gviz,
         Rsamtools,
@@ -18,16 +20,14 @@ Depends: R (>= 3.3.0),
         csaw,
         edgeR,
         knitr,
-        locfit,
         org.Mm.eg.db,
         rtracklayer,
-        statmod
+        rmarkdown
 License: Artistic-2.0
 Encoding: UTF-8
 LazyData: true
 VignetteBuilder: knitr
 biocViews: ImmunoOncologyWorkflow, Workflow, EpigeneticsWorkflow
 Workflow: true
-Suggests: knitr, rmarkdown
 NeedsCompilation: no
 URL: https://www.bioconductor.org/help/workflows/chipseqDB/
