@@ -11,7 +11,7 @@ author:
     - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
 date: "`r Sys.Date()`"
 vignette: >
-  %\VignetteIndexEntry{Differential binding of CBP in fibroblasts}
+  %\VignetteIndexEntry{3. Differential binding of CBP in fibroblasts}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 output:
