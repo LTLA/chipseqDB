@@ -71,7 +71,7 @@ The ENCODE blacklist is again used^[Assuming you ran the previous workflow, this
 library(BiocFileCache)
 bfc <- BiocFileCache("local", ask=FALSE)
 black.path <- bfcrpath(bfc, file.path("https://www.encodeproject.org",
-    "files/ENCFF419RSJ/@@download/ENCFF419RSJ.bed.gz"))
+    "files/ENCFF547MET/@@download/ENCFF547MET.bed.gz"))
 
 library(rtracklayer)
 blacklist <- import(black.path)
