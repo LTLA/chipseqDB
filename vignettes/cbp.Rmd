@@ -32,7 +32,7 @@ opts_chunk$set(fig.asp=1)
 
 Here, we perform a window-based DB analysis to identify differentially bound (DB) regions for CREB-binding protein (CBP).
 We use CBP ChIP-seq data from a study comparing wild-type (WT) and CBP knock-out (KO) animals [@kasper2014genomewide], with two biological replicates for each genotype.
-BAM files are downloaded using `r Biocpkg("chipseqDBData")` and cached for later use.
+BAM files and indices are downloaded using `r Biocpkg("chipseqDBData")` and cached for later use.
 
 ```{r}
 library(chipseqDBData)
@@ -124,7 +124,7 @@ This is because reads are extended to the value of `frag.len`, which is substant
 
 Composition biases are introduced when the amount of DB in each condition is unbalanced [@robinson2010scaling; @lun2014denovo].
 More binding in one condition means that more reads are sequenced at the binding sites, leaving fewer reads for the rest of the genome.
-This suppresses the genomic coverage at non-DB sites, resulting in spurious differences between libraries.
+This suppresses the genomic coverage at non-DB sites, resulting in spurious differences between samples. 
 
 To remove this bias, we assign reads to large genomic bins and assume that most bins represent non-DB background regions.
 Any systematic differences in the coverage of those bins is attributed to composition bias and is normalized out.
@@ -137,14 +137,14 @@ win.data <- normFactors(bins, se.out=win.data)
 (normfacs <- win.data$norm.factors)
 ```
 
-We visualize the effect of normalization with mean-difference plots between pairs of libraries (Figure \@ref(fig:compoplot)).
+We visualize the effect of normalization with mean-difference plots between pairs of samples (Figure \@ref(fig:compoplot)).
 The dense cloud in each plot represents the majority of bins in the genome.
 These are assumed to mostly contain background regions.
-A non-zero log-fold change for these bins indicates that composition bias is present between libraries.
+A non-zero log-fold change for these bins indicates that composition bias is present between samples. 
 The red line represents the log-ratio of normalization factors and passes through the centre of the cloud in each plot,
     indicating that the bias has been successfully identified and removed.
 
-```{r compoplot, fig.width=12, fig.asp=0.5, fig.cap="Mean-difference plots for the bin counts, comparing library 4 to all other libraries. The red line represents the log-ratio of the normalization factors between libraries."}
+```{r compoplot, fig.width=12, fig.asp=0.5, fig.cap="Mean-difference plots for the bin counts, comparing sample 4 to all other samples. The red line represents the log-ratio of the normalization factors between samples."}
 bin.ab <- scaledAverage(bins)
 adjc <- calculateCPM(bins, use.norm.factors=FALSE)
 
@@ -230,9 +230,9 @@ plotQLDisp(fit)
 
 These statistics are consistent with the presence of systematic differences in CBP enrichment between replicates.
 The dispersions for all windows are inflated to a similarly large value by the batch effect, resulting in low variability in the dispersions across windows.
-This is illustrated in Figure \@ref(fig:mdsplot) where the WT libraries are clearly separated in both dimensions of the MDS plot.
+This is illustrated in Figure \@ref(fig:mdsplot) where the WT samples are clearly separated in both dimensions of the MDS plot.
 
-```{r mdsplot, fig.cap="MDS plot with two dimensions for all libraries in the CBP data set. Libraries are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT libraries."}
+```{r mdsplot, fig.cap="MDS plot with two dimensions for all samples in the CBP data set. Samples are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT samples."}
 plotMDS(cpm(y, log=TRUE), top=10000, labels=genotype,
     col=c("red", "blue")[as.integer(genotype)])
 ```
@@ -320,7 +320,7 @@ symbols <- unlist(mapIds(org.Mm.eg.db, gene(greg), "SYMBOL",
 symbol(greg) <- symbols[gene(greg)]
 ```
 
-We visualize two tracks for each library -- one for the forward-strand coverage, another for the reverse-strand coverage.
+We visualize two tracks for each sample -- one for the forward-strand coverage, another for the reverse-strand coverage.
 This allows visualization of the strand bimodality that is characteristic of genuine TF binding sites.
 In Figure \@ref(fig:tfplot), two adjacent sites are present at the *Gbe1* promoter, both of which exhibit increased binding in the WT genotype.
 Coverage is also substantially different between the WT replicates, consistent with the presence of a batch effect.
