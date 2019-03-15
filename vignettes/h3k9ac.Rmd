@@ -65,6 +65,10 @@ diag.stats$Prop.marked <- diag.stats$Marked/diag.stats$Mapped*100
 diag.stats
 ```
 
+Note that all `r Biocpkg("csaw")` functions that read from a BAM file require BAM indices with `.bai` suffixes.
+In this case, index files have already been downloaded by `H3K9acData()`, 
+but users supplying their own files should take care to ensure that BAM indices are available with appropriate names.
+
 ## Obtaining the ENCODE blacklist for mm10
 
 A number of genomic regions contain high artifactual signal in ChIP-seq experiments.
@@ -101,7 +105,7 @@ Any user-defined set of regions can be used as a blacklist in this analysis.
 This tends to remove a greater number of problematic regions (especially microsatellites) compared to the ENCODE blacklist.
 However, the size of the UCSC list means that genuine DB sites may also be removed.
 Thus, the ENCODE blacklist is preferred for most applications.
-- Alternatively, if negative control libraries are available, they can be used to empirically identify problematic regions with the `r Biocpkg("GreyListChIP")` package.
+- Alternatively, if negative control samples are available, they can be used to empirically identify problematic regions with the `r Biocpkg("GreyListChIP")` package.
 These regions should be ignored as they have high coverage in the controls and are unlikely to be genuine binding sites.
 
 ## Setting up the read extraction parameters
@@ -153,7 +157,7 @@ Each read is directionally extended to the average fragment length (Figure \@ref
 Any position within the inferred fragment is a potential contact site for the protein of interest.
 To quantify binding in a genomic window, the number of these fragments overlapping the window is counted.
 The window is then moved to its next position on the genome and counting is repeated^[Each read is usually counted into multiple windows, which will introduce correlations between adjacent windows but will not otherwise affect the analysis.].
-This is done for all libraries such that a count is obtained for each window in each library.
+This is done for all samples such that a count is obtained for each window in each sample. 
 
 ```{r directional, echo=FALSE, fig.asp=0.4, fig.wide=TRUE, fig.cap="Directional extension of reads by the average fragment length `ext` in single-end ChIP-seq data. Each extended read represents an imputed fragment, and the number of fragments overlapping a window of a given `width` is counted."}
 par(mar=c(0,0,0,0), cex=1.2)
@@ -197,8 +201,9 @@ lines(c(10, 10, 6.9),
 text(5, 2.8, "fragment length (ext)")
 ```
 
-The `windowCounts()` function produces a `RangedSummarizedExperiment` object containing these counts in matrix form.
-Each row corresponds to a window and each column represents a library.
+The `windowCounts()` function produces a `RangedSummarizedExperiment` object containing a matrix of such counts.
+Each row corresponds to a window; each column represents a BAM file corresponding to a single sample^[Counting can be parallelized across files using the `BPPARAM=` argument.];
+and each entry of the matrix represents the number of fragments overlapping a particular window in a particular sample. 
 
 ```{r}
 win.data <- windowCounts(acdata$Path, param=param, width=150, ext=frag.len)
@@ -210,7 +215,7 @@ This corresponds roughly to the length of the DNA in a nucleosome [@humburg2011c
 The spacing between windows is set to the default of 50 bp, i.e., the start positions for adjacent windows are 50 bp apart.
 Smaller spacings can be used to improve spatial resolution, but will increase memory usage and runtime by increasing the number of windows required to cover the genome.
 This is unnecessary as increased resolution confers little practical benefit for this data set -- counts for very closely spaced windows will be practically identical.
-Finally, windows with very low counts (by default, less than a sum of 10 across all libraries) are removed to reduce memory usage.
+Finally, windows with very low counts (by default, less than a sum of 10 across all samples) are removed to reduce memory usage.
 This represents a preliminary filter to remove uninteresting windows corresponding to likely background regions.
 
 # Filtering windows by abundance
@@ -254,13 +259,13 @@ The actual filtering itself is done by simply subsetting the `RangedSummarizedEx
 filtered.data <- win.data[keep,]
 ```
 
-# Normalizing for library-specific trended biases
+# Normalizing for sample-specific trended biases
 
-Normalization is required to eliminate confounding library-specific biases prior to any comparisons between libraries.
-Here, a trended bias is present between libraries in Figure \@ref(fig:trendplot).
-This refers to a systematic fold-difference in window coverage between libraries that changes according to the average abundance of the window.
+Normalization is required to eliminate confounding sample-specific biases prior to any comparisons between samples.
+Here, a trended bias is present between samples in Figure \@ref(fig:trendplot).
+This refers to a systematic fold-difference in per-window coverage between samples that changes according to the average abundance of the window.
 
-```{r trendplot, fig.cap="Abundance-dependent trend in the log-fold change between two H3K9ac libraries (mature B over pro-B), across all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
+```{r trendplot, fig.cap="Abundance-dependent trend in the log-fold change between two H3K9ac samples (mature B over pro-B), across all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
 win.ab <- scaledAverage(filtered.data)
 adjc <- calculateCPM(filtered.data, use.offsets=FALSE)
 logfc <- adjc[,4] - adjc[,1]
@@ -286,9 +291,9 @@ head(offsets)
 The effect of non-linear normalization is visualized with another mean-difference plot.
 Once the offsets are applied to adjust the log-fold changes, the trend is eliminated from the plot (Figure \@ref(fig:normplot)).
 The cloud of points is also centred at a log-fold change of zero.
-This indicates that normalization was successful in removing the differences between libraries.
+This indicates that normalization was successful in removing the differences between samples. 
 
-```{r normplot, fig.cap="Effect of non-linear normalization on the trended bias between two H3K9ac libraries. Normalized log-fold changes are shown for all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
+```{r normplot, fig.cap="Effect of non-linear normalization on the trended bias between two H3K9ac samples. Normalized log-fold changes are shown for all windows retained after filtering. A smoothed spline fitted to the log-fold change against the average abundance is also shown in red."}
 norm.adjc <- calculateCPM(filtered.data, use.offsets=TRUE)
 norm.fc <- norm.adjc[,4]-norm.adjc[,1]
 smoothScatter(win.ab, norm.fc, ylim=c(-6, 6), xlim=c(0, 5),
@@ -299,7 +304,7 @@ lines(win.ab[o], fitted(lfit)[o], col="red", lty=2)
 ```
 
 The implicit assumption of non-linear methods is that most windows at each abundance are not DB.
-Any systematic difference between libraries is attributed to bias and is removed.
+Any systematic difference between samples is attributed to bias and is removed.
 The assumption of a non-DB majority is reasonable for this data set, given that the cell types being compared are quite closely related.
 However, it is not appropriate in cases where large-scale DB is expected, as removal of the difference would result in loss of genuine DB.
 An alternative normalization strategy for these situations will be described later in the CBP analysis.
@@ -310,7 +315,7 @@ An alternative normalization strategy for these situations will be described lat
 
 Counts are modelled using negative binomial generalized linear models (NB GLMs) in the `r Biocpkg("edgeR")` package [@mccarthy2012differential; @robinson2010edger].
 The NB distribution is useful as it can handle low, discrete counts for each window.
-The NB dispersion parameter allows modelling of biological variability between replicate libraries.
+The NB dispersion parameter allows modelling of biological variability between replicate samples. 
 GLMs can also accommodate complex experimental designs, though a simple design is sufficient for this study.
 
 ```{r}
@@ -386,12 +391,12 @@ This is particularly noticeable in Figure \@ref(fig:qlplot) with highly variable
 
 ## Examining the data with MDS plots
 
-Multi-dimensional scaling (MDS) plots are used to examine the similarities between libraries.
-The distance between a pair of libraries on this plot represents the overall log-fold change between those libraries.
+Multi-dimensional scaling (MDS) plots are used to examine the similarities between samples. 
+The distance between a pair of samples on this plot represents the overall log-fold change between those samples. 
 Ideally, replicates should cluster together while samples from different conditions should be separate.
-Libraries from different cell types separate well in Figure \@ref(fig:mdsplot), indicating that significant differences are likely to be present between cell types.
+Samples of different cell types separate well in Figure \@ref(fig:mdsplot), indicating that significant differences are likely to be present between cell types.
 
-```{r mdsplot, fig.cap="MDS plot with two dimensions for all libraries in the H3K9ac data set. Libraries are labelled and coloured according to the cell type."}
+```{r mdsplot, fig.cap="MDS plot with two dimensions for all samples in the H3K9ac data set. Samples are labelled and coloured according to the cell type."}
 plotMDS(norm.adjc, labels=celltype,
     col=c("red", "blue")[as.integer(celltype)])
 ```
@@ -647,11 +652,11 @@ if (cur.region!=GRanges("chr17", IRanges(34285101, 34290050))) {
 }
 ```
 
-One track is plotted for each library, in addition to the coordinate and annotation tracks.
+One track is plotted for each sample, in addition to the coordinate and annotation tracks.
 Coverage is plotted in terms of sequencing depth-per-million at each base.
 This corrects for differences in library sizes between tracks.
 
-```{r simplebroadplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a simple DB event between pro-B and mature B cells, across a broad region in the H3K9ac data set. Read coverage for each library is shown as a per-million value at each base."}
+```{r simplebroadplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a simple DB event between pro-B and mature B cells, across a broad region in the H3K9ac data set. Read coverage for each sample is shown as a per-million value at each base."}
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 for (i in seq_along(acdata$Path)) {
