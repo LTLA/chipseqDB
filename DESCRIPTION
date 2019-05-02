@@ -1,6 +1,6 @@
 Package: chipseqDB
 Title: A Bioconductor Workflow to Detect Differential Binding in ChIP-seq Data
-Version: 1.8.0
+Version: 1.9.0
 Date: 2019-03-14
 Authors@R: c(person(role=c("aut","cre"), "Aaron", "Lun", email = "infinite.monkeys.with.keyboards@gmail.com"),
         person(role="aut", "Gordon ", "Smyth"))
