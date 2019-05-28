@@ -1,10 +1,13 @@
 ---
 title: "Detecting differential enrichment of H3K27me3 in the mouse lung epithelium"
 author:
-  - name: Aaron T. L. Lun
-    affiliation: 
-    - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
-    - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+- name: Aaron T. L. Lun
+  affiliation: 
+  - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
+  - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+- name: Aliaksei Holik
+  affiliation:
+  - *WEHI
 date: "`r Sys.Date()`"
 vignette: >
   %\VignetteIndexEntry{4. Differential enrichment of H3K27me3 in lung epithelium}
@@ -12,8 +15,8 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 output:
   BiocStyle::html_document:
-    fig_caption: yes
     toc_float: yes
+    titlecaps: false
 bibliography: ref.bib
 ---
 
@@ -377,12 +380,12 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
 ```
 
 In contrast, we do not observe any DB regions overlapping the _Col1a2_ gene.
-This is consistent with its constitutive expression in both WT and KO lung epithelium, 
-such that no change in H3K27me3 enrichment is expected.
+No change in H3K27me3 enrichment is expected as this gene is constitutively expressed in both WT and KO lung epithelium.
 
 ```{r}
 col1a2 <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)["12843"] # Col1a2 Entrez ID
-subsetByOverlaps(out.ranges, col1a2)
+cur.region <- subsetByOverlaps(out.ranges, col1a2)
+cur.region
 ```
 
 ```{r, results="hide", echo=FALSE}
