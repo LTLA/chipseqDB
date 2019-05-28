@@ -23,21 +23,17 @@ bibliography: ref.bib
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
-opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
-opts_chunk$set(fig.asp=1)
+opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE, cache=TRUE)
 ```
 
 # Overview
 
 Here, we perform a window-based DB analysis to identify regions of differential H3K27me3 enrichment in mouse lung epithelium.
 H3K27me3 is associated with transcriptional repression and is usually observed with broad regions of enrichment.
-The aim of this workflow is to demonstrate how to accommodate such broad marks in `r Biocpkg("csaw")`,
+The aim of this workflow is to demonstrate how to analyze these broad marks with `r Biocpkg("csaw")`,
 especially at variable resolutions with multiple window sizes.
-
 We use H3K27me3 ChIP-seq data from a study comparing wild-type (WT) and _Ezh2_ knock-out (KO) animals [@galvis2015repression],
 contains two biological replicates for each genotype.
-Ezh2 is one of the proteins responsible for depositing H3K27me3,
-hence the interest in observing the effects of the former's depletion on the latter's genomic distribution.
 We download BAM files and indices using `r Biocpkg("chipseqDBData")`.
 
 ```{r}
@@ -215,8 +211,7 @@ design
 ```
 
 We estimate the negative binomial (NB) and quasi-likelihood (QL) dispersions for each window [@lund2012ql].
-The increasing trend in Figure \@ref(fig:bcvplot) is often observed after normalization for composition biases,
-where replicates exhibit some differences in efficiency that manifest as larger dispersions at high abundance.
+We again observe an increasing trend in the NB dispersions with respect to abundance (Figure \@ref(fig:bcvplot)).
 
 ```{r bcvplot, fig.cap="Abundance-dependent trend in the BCV for each window, represented by the blue line. Common (red) and tagwise estimates (black) are also shown."}
 y <- estimateDisp(y, design)
@@ -233,7 +228,9 @@ summary(fit$df.prior)
 plotQLDisp(fit)
 ```
 
-The samples separate by genotype in the MDS plot (Figure \@ref(fig:mdsplot)),
+These results are consistent with the presence of systematic differences in enrichment between replicates,
+as discussed in the `r Biocpkg("chipseqDB", "cbp.html#statistical-modelling-of-biological-variability", "CBP analysis")`.
+Nonetheless, the samples separate by genotype in the MDS plot (Figure \@ref(fig:mdsplot)),
 which suggests that the downstream analysis will be able to detect DB regions.
 
 ```{r mdsplot, fig.cap="MDS plot with two dimensions for all samples in the H3K27me3 data set. Samples are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT samples."}
@@ -250,7 +247,11 @@ res <- glmQLFTest(fit, contrast=contrast)
 
 # Consolidating results from multiple window sizes
 
-Assume we repeated the entire analysis using 500 bp windows.
+Consolidation allows the analyst to incorporate information from a range of different window sizes,
+each of which has a different trade-off between resolution and count size.
+This is particularly useful for broad marks where the width of an enriched region can be variable,
+as can the width of the differentially bound interval of an enriched region.
+To demonstrate, we repeat the entire analysis using 500 bp windows.
 Compared to our previous 2 kbp analysis, this provides greater spatial resolution at the cost of lowering the counts.
 
 ```{r}
@@ -293,13 +294,20 @@ tabcom <- consolidateTests(combined$id, list(res$table, res2$table),
     weight.list=combined$weight)
 is.sig <- tabcom$FDR <= 0.05
 summary(is.sig)
+```
+
+Ezh2 is one of the proteins responsible for depositing H3K27me3, 
+so we might expect that most DB regions have increased enrichment in the WT condition.
+However, the opposite seems to be true here.
+The most obvious explanation is that loss of Ezh2 triggers downstream effects in the surrounding regulatory network,
+though it is also possible that Ezh2 itself has a role in this system beyond the deposition of H3K27me3.
+
+```{r}
 table(tabcom$direction[is.sig])
 ```
 
 We also obtain statistics for the window with the lowest $p$-value in each region.
-Interestingly, we observe some regions that increase in enrichment in the KO condition despite the loss of Ezh2's H3K27me3 writing activity.
-The most obvious explanation is that of downstream effects in the regulatory network around Ezh2,
-though it is also possible that Ezh2 itself has a role in this system beyond the deposition of H3K27me3.
+The signs of the log-fold changes are largely consistent with the `direction` numbers above.
 
 ```{r}
 tabbest <- consolidateTests(combined$id, list(res$table, res2$table),
@@ -317,14 +325,10 @@ mcols(out.ranges) <- data.frame(tabcom,
 saveRDS(file="h3k27me3_results.rds", out.ranges)
 ```
 
-Consolidation allows the analyst to incorporate information from a range of different window sizes,
-each of which has a different trade-off between resolution and count size.
-This is particularly useful for broad marks where the width of an enriched region can be variable,
-as can the width of the differentially bound interval of an enriched region.
-
 # Annotation and visualization
 
-We add annotation for each region using the `detailRanges` function, as previously described.
+We add annotation for each region using the `detailRanges()` function, 
+as `r Biocpkg("chipseqDB", "h3k9ac.html#using-the-detailranges-function", "previously described")`.
 
 ```{r}
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
