@@ -33,8 +33,8 @@ especially at variable resolutions with multiple window sizes.
 
 We use H3K27me3 ChIP-seq data from a study comparing wild-type (WT) and _Ezh2_ knock-out (KO) animals [@galvis2015repression],
 contains two biological replicates for each genotype.
-Most - if not all - of the DB sites should exhibit increased H3K27me3 binding in the WT condition, 
-given that Ezh2 is one of the proteins responsible for depositing H3K27me3.
+Ezh2 is one of the proteins responsible for depositing H3K27me3,
+hence the interest in observing the effects of the former's depletion on the latter's genomic distribution.
 We download BAM files and indices using `r Biocpkg("chipseqDBData")`.
 
 ```{r}
@@ -65,16 +65,32 @@ diag.stats
 ```
 
 We construct a `readParam` object to standardize the parameter settings in this analysis.
-The cached ENCODE blacklist is re-used to remove reads in problematic regions [@encode2012encode].
+For consistency with the original analysis by @galvis2015repression,
+we will define the blacklist using the the predicted repeats from the RepeatMasker software.
 
 ```{r}
 library(BiocFileCache)
 bfc <- BiocFileCache("local", ask=FALSE)
-black.path <- bfcrpath(bfc, file.path("https://www.encodeproject.org",
-    "files/ENCFF547MET/@@download/ENCFF547MET.bed.gz"))
+black.path <- bfcrpath(bfc, file.path("http://hgdownload.cse.ucsc.edu",
+    "goldenPath/mm10/bigZips/chromOut.tar.gz"))
+tmpdir <- tempfile()
+dir.create(tmpdir)
+untar(black.path, exdir=tmpdir)
 
-library(rtracklayer)
-blacklist <- import(black.path)
+# Iterate through all chromosomes.
+collected <- list()
+for (x in list.files(tmpdir, full=TRUE)) {
+    f <- list.files(x, full=TRUE, pattern=".fa.out")
+    to.get <- vector("list", 15)
+    to.get[[5]] <- "character"
+    to.get[6:7] <- "integer"
+    collected[[length(collected)+1]] <- read.table(f, skip=3, 
+        stringsAsFactors=FALSE, colClasses=to.get)
+}
+
+collected <- do.call(rbind, collected)
+blacklist <- GRanges(collected[,1], IRanges(collected[,2], collected[,3]))
+blacklist
 ```
 
 We set the minimum mapping quality score to 10 to remove poorly or non-uniquely aligned reads.
@@ -121,28 +137,29 @@ Figure \@ref(fig:compoplot) shows the effect of normalization on the relative en
 We see that log-ratio of normalization factors passes through the centre of the cloud of background regions in each plot,
 indicating that the bias has been successfully identified and removed.
 
-```{r compoplot, fig.width=12, fig.asp=0.5, fig.cap="Mean-difference plots for the bin counts, comparing sample 3 to all other samples. The red line represents the log-ratio of the normalization factors between samples."}
+```{r compoplot, fig.width=12, fig.asp=0.5, fig.cap="Mean-difference plots for the bin counts, comparing sample 1 to all other samples. The red line represents the log-ratio of the normalization factors between samples."}
 bin.ab <- scaledAverage(bins)
 adjc <- calculateCPM(bins, use.norm.factors=FALSE)
 
 par(cex.lab=1.5, mfrow=c(1,3))
-smoothScatter(bin.ab, adjc[,1]-adjc[,3], ylim=c(-6, 6),
-    xlab="Average abundance", ylab="Log-ratio (1 vs 3)")
+smoothScatter(bin.ab, adjc[,1]-adjc[,2], ylim=c(-6, 6),
+    xlab="Average abundance", ylab="Log-ratio (1 vs 2)")
 abline(h=log2(normfacs[1]/normfacs[4]), col="red")
 
-smoothScatter(bin.ab, adjc[,2]-adjc[,3], ylim=c(-6, 6),
-    xlab="Average abundance", ylab="Log-ratio (2 vs 3)")
+smoothScatter(bin.ab, adjc[,1]-adjc[,3], ylim=c(-6, 6),
+    xlab="Average abundance", ylab="Log-ratio (1 vs 3)")
 abline(h=log2(normfacs[2]/normfacs[4]), col="red")
 
-smoothScatter(bin.ab, adjc[,4]-adjc[,3], ylim=c(-6, 6),
-    xlab="Average abundance", ylab="Log-ratio (4 vs 3)")
+smoothScatter(bin.ab, adjc[,1]-adjc[,4], ylim=c(-6, 6),
+    xlab="Average abundance", ylab="Log-ratio (1 vs 4)")
 abline(h=log2(normfacs[3]/normfacs[4]), col="red")
 ```
 
 # Filtering of low-abundance windows
 
 We estimate the global background and remove low-abundance windows that are not enriched above this background level.
-As diffuse marks tend to have weaker enrichment, we require a fold-change of 2 above the background to retain a window.
+To retain a window, we require it to have at least 2-fold more coverage than the average background.
+This is less stringent than the thresholds used in previous analyses, owing the the weaker enrichment observed for diffuse marks.
 
 ```{r}
 filter.stat <- filterWindows(win.data, bins, type="global")
@@ -204,8 +221,8 @@ summary(y$trended.dispersion)
 plotBCV(y)
 ```
 
-The estimated prior d.f. is also infinite, meaning that all the QL dispersions are equal to the trend (Figure \@ref(fig:qlplot)).
-As in the CBP workflow, this is consistent with a systematic difference in H2K27me3 enrichment between replicates.
+The QL dispersions are strongly shrunk towards the trend (Figure \@ref(fig:qlplot)), 
+indicating that there is little variability in the dispersions across windows.
 
 ```{r qlplot, fig.cap="Effect of EB shrinkage on the raw QL dispersion estimate for each window (black) towards the abundance-dependent trend (blue) to obtain squeezed estimates (red)."}
 fit <- glmQLFit(y, design, robust=TRUE)
@@ -213,54 +230,19 @@ summary(fit$df.prior)
 plotQLDisp(fit)
 ```
 
-Fortunately, the samples still separate by genotype in the MDS plot (Figure \@ref(fig:mdsplot)).
-This suggests that the downstream analysis will be able to detect DB regions.
+The samples separate by genotype in the MDS plot (Figure \@ref(fig:mdsplot)),
+which suggests that the downstream analysis will be able to detect DB regions.
 
 ```{r mdsplot, fig.cap="MDS plot with two dimensions for all samples in the H3K27me3 data set. Samples are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT samples."}
 plotMDS(cpm(y, log=TRUE), top=10000, labels=genotype,
     col=c("red", "blue")[as.integer(genotype)])
 ```
 
-# Testing for DB
-
-DB windows are identified using the QL F-test.
+We then test for DB between conditions in each window using the QL F-test.
 
 ```{r}
 contrast <- makeContrasts(wt-ko, levels=design)
 res <- glmQLFTest(fit, contrast=contrast)
-```
-
-Windows are clustered into regions and the region-level FDR is controlled using Simes' method [@simes1986; @lun2014denovo].
-
-```{r}
-merged <- mergeWindows(rowRanges(filtered.data), tol=100, max.width=10000)
-tabcom <- combineTests(merged$id, res$table)
-is.sig <- tabcom$FDR <= 0.05
-summary(is.sig)
-```
-
-The vast majority of significant regions have increased H3K27me3 binding in the WT genotype.
-This is expected given that protein function should be lost in the KO genotype.
-
-```{r}
-table(tabcom$direction[is.sig])
-
-# Direction according the best window in each cluster.
-tabbest <- getBestTest(merged$id, res$table)
-is.sig.pos <- (tabbest$logFC > 0)[is.sig]
-summary(is.sig.pos)
-```
-
-These results are saved to file, as previously described.
-Key objects are also saved for convenience.
-
-```{r}
-out.ranges <- merged$region
-mcols(out.ranges) <- data.frame(tabcom,
-    best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
-    best.logFC=tabbest$logFC)
-saveRDS(file="h3k27me3_results.rds", out.ranges)
-save(file="h3k27me3_objects.Rda", win.data, bins)
 ```
 
 # Consolidating results from multiple window sizes
@@ -295,20 +277,41 @@ This clusters both sets of windows together into a single set of regions.
 combined <- consolidateWindows(list(filtered.data, filtered.data2), 
     equiweight=TRUE, merge.args=list(tol=100))
 names(combined)
-out.ranges2 <- combined$region
-out.ranges2
+combined$region
 ```
 
 We combine statistics across windows for each region using the `consolidateTests()` function.
-This uses weighted contributions from the two sets of windows,
+Specifically, we compute combined $p$-values using Simes' method for region-level FDR control [@simes1986; @lun2014denovo].
+This weights the contributions from the two sets of windows
 to ensure that the combined $p$-value for each region is not dominated by the analysis with more (smaller) windows.
 
 ```{r}
-tabcom2 <- consolidateTests(combined$id, list(res$table, res2$table),
+tabcom <- consolidateTests(combined$id, list(res$table, res2$table),
     weight.list=combined$weight)
-is.sig2 <- tabcom2$FDR <= 0.05
-summary(is.sig2)
-table(tabcom2$direction[is.sig])
+is.sig <- tabcom$FDR <= 0.05
+summary(is.sig)
+table(tabcom$direction[is.sig])
+```
+
+We also obtain statistics for the window with the lowest $p$-value in each region.
+Interestingly, we observe some regions that increase in enrichment in the KO condition despite the loss of Ezh2's H3K27me3 writing activity.
+The most obvious explanation is that of downstream effects in the regulatory network around Ezh2,
+though it is also possible that Ezh2 itself has a role in this system beyond the deposition of H3K27me3.
+
+```{r}
+tabbest <- consolidateTests(combined$id, list(res$table, res2$table),
+    weight.list=combined$weight, FUN=getBestTest)
+is.sig.pos <- (tabbest$logFC > 0)[is.sig]
+summary(is.sig.pos)
+```
+
+Finally, these results are saved to file for future reference.
+
+```{r}
+out.ranges <- combined$region
+mcols(out.ranges) <- data.frame(tabcom,
+    best.logFC=tabbest$logFC)
+saveRDS(file="h3k27me3_results.rds", out.ranges)
 ```
 
 Consolidation allows the analyst to incorporate information from a range of different window sizes,
@@ -318,7 +321,7 @@ as can the width of the differentially bound interval of an enriched region.
 
 # Annotation and visualization
 
-Annotation for each region is added using the `detailRanges` function, as previously described.
+We add annotation for each region using the `detailRanges` function, as previously described.
 
 ```{r}
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
@@ -328,19 +331,17 @@ anno <- detailRanges(out.ranges, orgdb=org.Mm.eg.db,
 mcols(out.ranges) <- cbind(mcols(out.ranges), anno)
 ```
 
-One of the top-ranked DB regions will be visualized here.
-We pick one of the few regions that are enriched in the KO condition,
-which is likely to be more interesting as it occurs in spite of the loss of a H3K27me3 writer.
+We visualize one of the DB regions overlapping the _Cdx2_ gene to reproduce the results in @holik2015transcriptome.
 
 ```{r}
-o <- order(out.ranges$PValue)    
-cur.region <- out.ranges[o[2]]
+cdx2 <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)["12591"] # Cdx2 Entrez ID
+cur.region <- subsetByOverlaps(out.ranges, cdx2)[1]
 cur.region
 ```
 
 ```{r, results="hide", echo=FALSE}
-if (!overlapsAny(cur.region, GRanges("chr16", IRanges(70313851, 70314860)), type="equal")) {
-        warning("first region does not match expectations")
+if (cur.region$FDR > 0.05 || cur.region$best.logFC < 0) {
+    stop("Cdx2 should be significantly upregulated in WT")
 }
 ```
 
@@ -357,7 +358,8 @@ symbols <- unlist(mapIds(org.Mm.eg.db, gene(greg), "SYMBOL",
 symbol(greg) <- symbols[gene(greg)]
 ```
 
-In Figure \@ref(fig:tfplot), we see enrichment of H3K27me3 in the KO condition at a bidirectional promoter.
+In Figure \@ref(fig:tfplot), we see enrichment of H3K27me3 in the WT condition at the _Cdx2_ locus.
+This is consistent with the known regulatory relationship between Ezh2 and _Cdx2_.
 
 ```{r tfplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a region with H3K27me3 enrichment in KO (top two tracks) against the WT (last two tracks)."}
 collected <- list()
@@ -372,6 +374,21 @@ for (i in seq_along(h3k27me3data$Path)) {
 
 plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)),
     from=start(cur.region), to=end(cur.region))
+```
+
+In contrast, we do not observe any DB regions overlapping the _Col1a2_ gene.
+This is consistent with its constitutive expression in both WT and KO lung epithelium, 
+such that no change in H3K27me3 enrichment is expected.
+
+```{r}
+col1a2 <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)["12843"] # Col1a2 Entrez ID
+subsetByOverlaps(out.ranges, col1a2)
+```
+
+```{r, results="hide", echo=FALSE}
+if (cur.region$FDR < 0.05) {
+    stop("Col1a2 should not be significantly DB")
+}
 ```
 
 # Session information
