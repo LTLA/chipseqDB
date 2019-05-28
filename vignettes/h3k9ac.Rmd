@@ -1,14 +1,14 @@
 ---
-title: "Detecting differential enrichment of H3K9ac in murine B cells"
+title: Detecting differential enrichment of H3K9ac in murine B cells
 author:
-  - name: Aaron T. L. Lun
-    affiliation: 
-    - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
-    - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
-  - name: Gordon K. Smyth
-    affiliation: 
-    - *WEHI
-    - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+- name: Aaron T. L. Lun
+  affiliation: 
+  - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
+  - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+- name: Gordon K. Smyth
+  affiliation: 
+  - *WEHI
+  - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
 date: "`r Sys.Date()`"
 vignette: >
   %\VignetteIndexEntry{2. Differential enrichment of H3K9ac in B cells}
@@ -24,8 +24,7 @@ bibliography: ref.bib
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
-opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
-opts_chunk$set(fig.asp=1)
+opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE, cache=TRUE)
 ```
 
 # Overview
@@ -46,7 +45,8 @@ acdata
 ## Examining mapping statistics
 
 We use methods from the `r Biocpkg("Rsamtools")` package to compute some mapping statistics for each BAM file.
-Ideally, the proportion of mapped reads should be high (70-80% or higher), while the proportion of marked reads should be low (below 20%).
+Ideally, the proportion of mapped reads should be high (70-80% or higher), 
+while the proportion of marked reads should be low (generally below 20%).
 
 ```{r mapstat}
 library(Rsamtools)
@@ -81,7 +81,7 @@ As such, these problematic regions must be removed prior to further analysis.
 This is done with an annotated blacklist for the mm10 build of the mouse genome, 
 constructed by identifying consistently problematic regions from ENCODE datasets [@encode2012encode].
 We download this BED file and save it into a local cache with the `r Biocpkg("BiocFileCache")` package.
-This allows it to be used again in later workflows without requiring a new download.
+This allows it to be used again in later workflows without being re-downloaded.
 
 ```{r}
 library(BiocFileCache)
@@ -90,8 +90,8 @@ black.path <- bfcrpath(bfc, file.path("https://www.encodeproject.org",
     "files/ENCFF547MET/@@download/ENCFF547MET.bed.gz"))
 ```
 
-Genomic intervals in the blacklist are loaded to memory using the `import()` method from the `r Biocpkg("rtracklayer")` package.
-All reads mapped to those intervals will be ignored during processing in `r Biocpkg("csaw")` by specifying the `discard=` parameter (see below).
+Genomic intervals in the blacklist are loaded using the `import()` method from the `r Biocpkg("rtracklayer")` package.
+All reads mapped within the blacklisted intervals will be ignored during processing in `r Biocpkg("csaw")` by specifying the `discard=` parameter (see below).
 
 ```{r}
 library(rtracklayer)
@@ -111,7 +111,7 @@ These regions should be ignored as they have high coverage in the controls and a
 ## Setting up the read extraction parameters
 
 In the `r Biocpkg("csaw")` package, the `readParam` object determines which reads are extracted from the BAM files.
-The idea is to set this up once and to re-use it in all relevant functions.
+The intention is to set this up once and to re-use it in all relevant functions.
 For this analysis, reads are ignored if they map to blacklist regions or do not map to the standard set of mouse nuclear chromosomes^[In this case, we are not interested in the mitochondrial genome, as these should not be bound by histones anyway.].
 
 ```{r, message=FALSE}
@@ -120,7 +120,7 @@ standard.chr <- paste0("chr", c(1:19, "X", "Y"))
 param <- readParam(minq=20, discard=blacklist, restrict=standard.chr)
 ```
 
-Reads are also ignored if they have a mapping quality (MAPQ) score below 20^[This is more stringent than usual, to account for the fact that short reads (32-36 bp) are more difficult to accurately align.].
+Reads are also ignored if they have a mapping quality (MAPQ) score below 20^[This is more stringent than usual, to account for the fact that the short reads ued here (32-36 bp) are more difficult to accurately align.].
 This avoids spurious results due to weak or non-unique alignments that should be assigned low MAPQ scores by the aligner.
 Note that the range of MAPQ scores will vary between aligners, so some inspection of the BAM files is necessary to choose an appropriate value.
 
@@ -129,7 +129,7 @@ Note that the range of MAPQ scores will vary between aligners, so some inspectio
 Strand bimodality is often observed in ChIP-seq experiments involving narrow binding events like H3K9ac marking.
 This refers to the presence of distinct subpeaks on each strand and is quantified with cross-correlation plots [@kharchenko2008design].
 A strong peak in the cross-correlations should be observed if immunoprecipitation was successful.
-The delay distance at the peak corresponds to the distance between forward-/reverse-strand subpeaks.
+The delay distance at the peak corresponds to the distance between forward- and reverse-strand subpeaks.
 This is identified from Figure \@ref(fig:ccfplot) and is used as the average fragment length for this analysis.
 
 ```{r}
@@ -146,7 +146,7 @@ text(x=frag.len, y=min(x), paste(frag.len, "bp"), pos=4, col="red")
 
 Only unmarked reads (i.e., not potential PCR duplicates) are used to calculate the cross-correlations.
 This reduces noise from variable PCR amplification and decreases the size of the "phantom" peak at the read length [@landt2012chipseq].
-However, removal of marked reads is risky as it caps the signal in high-coverage regions of the genome.
+However, general removal of marked reads is risky as it caps the signal in high-coverage regions of the genome.
 This can result in loss of power to detect DB, or introduction of spurious DB when the same cap is applied to libraries of different sizes.
 Thus, the marking status of each read will be ignored in the rest of the analysis, i.e., no duplicates will be removed in downstream steps.
 
@@ -231,7 +231,7 @@ The filter threshold is defined based on the assumption that most regions in the
 Reads are counted into large bins and the median coverage across those bins is used as an estimate of the background abundance^[Large bins are necessary to obtain a precise estimate of background coverage, which would otherwise be too low in individual windows.].
 This estimate is then compared to the average abundances of the windows, after rescaling to account for differences in the window and bin sizes.
 A window is only retained if its coverage is 3-fold higher than that of the background regions,
-    i.e., the abundance of the window is greater than the background abundance estimate by log~2~(3) or more.
+i.e., the abundance of the window is greater than the background abundance estimate by log~2~(3) or more.
 This removes a large number of windows that are weakly or not marked and are likely to be irrelevant.
 
 ```{r}
@@ -253,7 +253,7 @@ threshold <- filter.stat$abundances[1] - filter.stat$filter[1] + log2(min.fc)
 abline(v=threshold, col="red")
 ```
 
-The actual filtering itself is done by simply subsetting the `RangedSummarizedExperiment` object.
+The filtering itself is done by simply subsetting the `RangedSummarizedExperiment` object.
 
 ```{r}
 filtered.data <- win.data[keep,]
@@ -280,7 +280,7 @@ lines(win.ab[o], fitted(lfit)[o], col="red", lty=2)
 Trended biases cannot be removed by scaling methods like TMM normalization [@robinson2010scaling], as the amount of scaling required varies with the abundance of the window.
 Rather, non-linear normalization methods must be used.
 `r Biocpkg("csaw")` implements a version of the fast loess method [@ballman2004fast] that has been modified to handle count data [@lun2015csaw].
-This produces a matrix of offsets that can be used during GLM fitting.
+This produces a matrix of offsets that can be used during model fitting.
 
 ```{r}
 filtered.data <- normOffsets(filtered.data)
@@ -307,11 +307,11 @@ The implicit assumption of non-linear methods is that most windows at each abund
 Any systematic difference between samples is attributed to bias and is removed.
 The assumption of a non-DB majority is reasonable for this data set, given that the cell types being compared are quite closely related.
 However, it is not appropriate in cases where large-scale DB is expected, as removal of the difference would result in loss of genuine DB.
-An alternative normalization strategy for these situations will be described later in the CBP analysis.
+An alternative normalization strategy for these situations will be described later in the `r Biocpkg("chipseqDB", "cbp.html#normalization-for-composition-biases", "CBP analysis")`.
 
 # Statistical modelling of biological variability
 
-## Introduction
+## Setting up the design matrix 
 
 Counts are modelled using negative binomial generalized linear models (NB GLMs) in the `r Biocpkg("edgeR")` package [@mccarthy2012differential; @robinson2010edger].
 The NB distribution is useful as it can handle low, discrete counts for each window.
@@ -358,7 +358,7 @@ The tagwise BCVs should also be dispersed above and below the fitted trend, indi
 plotBCV(y)
 ```
 
-For most data sets, one would expect to see a trend that decreases to a plateau with increasing average abundance.
+For most sequencing count data, we expect to see a decreasing trend that plateaus with increasing average abundance.
 This reflects the greater reliability of large counts, where the effects of stochasticity and technical artifacts (e.g., mapping errors, PCR duplicates) are averaged out.
 We observe no clear trend in Figure \@ref(fig:bcvplot) as the windows have already been filtered to the plateau.
 This is still a satisfactory result as it indicates that the retained windows have low variability and more power to detect DB.
@@ -394,7 +394,8 @@ This is particularly noticeable in Figure \@ref(fig:qlplot) with highly variable
 Multi-dimensional scaling (MDS) plots are used to examine the similarities between samples. 
 The distance between a pair of samples on this plot represents the overall log-fold change between those samples. 
 Ideally, replicates should cluster together while samples from different conditions should be separate.
-Samples of different cell types separate well in Figure \@ref(fig:mdsplot), indicating that significant differences are likely to be present between cell types.
+While the mature B replicates are less tightly grouped, samples still separate by cell type in Figure \@ref(fig:mdsplot).
+This suggests that our downstream analysis will be able to detect significant differences in enrichment between cell types.
 
 ```{r mdsplot, fig.cap="MDS plot with two dimensions for all samples in the H3K9ac data set. Samples are labelled and coloured according to the cell type."}
 plotMDS(norm.adjc, labels=celltype,
@@ -407,7 +408,7 @@ plotMDS(norm.adjc, labels=celltype,
 
 Each window is tested for significant differences between cell types using the QL F-test [@lund2012ql].
 This is superior to the likelihood ratio test that is typically used for GLMs, as the QL F-test accounts for the uncertainty in dispersion estimation.
-One *p*-value is produced for each window, representing the evidence against the null hypothesis (i.e., that no DB is present in the window).
+One $p$-value is produced for each window, representing the evidence against the null hypothesis (i.e., that no DB is present in the window).
 For this analysis, the comparison is parametrized such that the reported log-fold change for each window represents that of the coverage in pro-B cells over their mature B counterparts.
 
 ```{r}
@@ -418,38 +419,43 @@ head(res$table)
 
 ## Controlling the FDR across regions
 
-One might attempt to control the FDR by applying the Benjamini-Hochberg (BH) method to the window-level *p*-values [@benjamini1995controlling].
+One might attempt to control the FDR by applying the Benjamini-Hochberg (BH) method to the window-level $p$-values [@benjamini1995controlling].
 However, the features of interest are not windows, but the genomic regions that they represent.
 Control of the FDR across windows does not guarantee control of the FDR across regions [@lun2014denovo].
 The latter is arguably more relevant for the final interpretation of the results.
 
-Control of the region-level FDR is achieved by aggregating windows into regions and combining the *p*-values.
+We instead control the region-level FDR by aggregating windows into regions and combining the $p$-values.
 Here, adjacent windows less than 100 bp apart are aggregated into clusters.
 Each cluster represents a genomic region.
 Smaller values of `tol` allow distinct marking events to kept separate,
-   while larger values provide a broader perspective, e.g., by considering adjacent co-regulated sites as a single entity.
+while larger values provide a broader perspective, e.g., by considering adjacent co-regulated sites as a single entity.
 Chaining effects are mitigated by setting a maximum cluster width of 5 kbp.
 
 ```{r}
 merged <- mergeWindows(rowRanges(filtered.data), tol=100, max.width=5000)
+merged$region
 ```
 
-A combined *p*-value is computed for each cluster using the method of @simes1986, based on the *p*-values of the constituent windows.
+A combined $p$-value is computed for each cluster using the method of @simes1986, 
+based on the $p$-values of the constituent windows.
 This represents the evidence against the global null hypothesis for each cluster, i.e., that no DB exists in any of its windows.
 Rejection of this global null indicates that the cluster (and the region that it represents) contains DB.
-Applying the BH method to the combined *p*-values allows the region-level FDR to be controlled.
+Applying the BH method to the combined $p$-values allows the region-level FDR to be controlled.
 
 ```{r}
 tabcom <- combineTests(merged$id, res$table)
 head(tabcom)
 ```
 
-Each row of the output table contains the statistics for a single cluster, including the combined *p*-value before and after the BH correction.
-Additional fields include `nWindows`, the total number of windows in the cluster; `logFC.up`, the number of windows with a DB log-fold change above 0.5; and `log.FC.down`, the number fof windows with a log-fold change below -0.5.
+Each row of the output table contains the statistics for a single cluster, 
+including the combined *p*-value before and after the BH correction.
+Additional fields include `nWindows`, the total number of windows in the cluster; 
+`logFC.up`, the number of windows with a DB log-fold change above 0.5; 
+and `log.FC.down`, the number fof windows with a log-fold change below -0.5.
 
 ## Examining the scope and direction of DB
 
-The total number of DB regions at a FDR of 5% is easily calculated.
+We can easily calculate the total number of DB regions at a FDR of 5%.
 
 ```{r}
 is.sig <- tabcom$FDR <= 0.05
@@ -474,8 +480,9 @@ head(tabbest)
 
 In the above table, each row contains the statistics for each cluster.
 Of interest are the `best` and `logFC` fields.
-The former is the index of the window that is the most significant in each cluster, while the latter is the log-fold change of that window.
-This is used to obtain a summary of the direction of DB across all clusters/regions.
+The former is the index of the window that is the most significant in each cluster, 
+while the latter is the log-fold change of that window.
+This is used to obtain a summary of the direction of DB across all clusters.
 
 ```{r}
 is.sig.pos <- (tabbest$logFC > 0)[is.sig]
@@ -483,13 +490,14 @@ summary(is.sig.pos)
 ```
 
 This approach is generally satisfactory, though it will not capture multiple changes in opposite directions^[Try `mixedClusters()` to formally detect clusters that contain significant changes in both directions.].
-It also tends to overstate the change in each cluster.
+It also tends to overstate the magnitude of the log-fold change in each cluster.
 
 # Saving results to file
 
 One approach to saving results is to store all statistics in the metadata of a `GRanges` object.
-This is useful as it keeps the statistics and coordinates together for each cluster, avoiding problems with synchronization in downstream steps.
-The midpoint and log-fold change of the best window are also stored.
+This is useful as it keeps the statistics and coordinates together for each cluster, 
+avoiding problems with synchronization in downstream steps.
+We also store the midpoint and log-fold change of the most significant window in each cluster.
 The updated `GRanges` object is then saved to file as a serialized R object with the `saveRDS` function.
 
 ```{r}
@@ -501,19 +509,12 @@ saveRDS(file="h3k9ac_results.rds", out.ranges)
 ```
 
 For input into other programs like genome browsers, results need to be saved in a more conventional format.
-Here, coordinates of DB regions are saved in BED format via `r Biocpkg("rtracklayer")`, using a log-transformed FDR as the score.
+Here, coordinates of DB regions are saved in BED format via `r Biocpkg("rtracklayer")`, using the log-transformed FDR as the score.
 
 ```{r}
 simplified <- out.ranges[is.sig]
 simplified$score <- -10*log10(simplified$FDR)
 export(con="h3k9ac_results.bed", object=simplified)
-```
-
-Saving the `RangedSummarizedExperiment` objects is also recommended.
-This avoids the need to re-run the time-consuming read counting steps if parts of the analysis need to be repeated.
-
-```{r}
-save(file="h3k9ac_objects.Rda", win.data, bins)
 ```
 
 # Interpreting the DB results
@@ -522,10 +523,11 @@ save(file="h3k9ac_objects.Rda", win.data, bins)
 
 ### Using the `detailRanges` function
 
-`r Biocpkg("csaw")` provides its own annotation function, `detailRanges`.
+`r Biocpkg("csaw")` provides its own annotation function, `detailRanges()`.
 This identifies all genic features overlapping each region and reports them in a compact string form.
 Briefly, features are reported as `SYMBOL:STRAND:TYPE` where `SYMBOL` represents the gene symbol;
-`STRAND` reports the strand of the gene; and `TYPE` reports the type(s) of overlapped feature, e.g., `E` for exons, `P` for promoters, `I` for introns^[Introns are only reported if an exon is not overlapped.].
+`STRAND` reports the strand of the gene; and `TYPE` reports the type(s) of overlapped feature, 
+e.g., `E` for exons, `P` for promoters, `I` for introns^[Introns are only reported if an exon is not overlapped.].
 
 ```{r, message=FALSE}
 library(org.Mm.eg.db)
@@ -596,7 +598,8 @@ Promoters with no overlapping windows are assigned `NA` values for the various f
 ```{r}
 olap <- findOverlaps(prom, rowRanges(filtered.data))
 tabprom <- combineOverlaps(olap, res$table)
-head(data.frame(ID=prom$tx_name, Gene=prom$gene_name, tabprom)[!is.na(tabprom$PValue),])
+with.anno <- data.frame(ID=prom$tx_name, Gene=prom$gene_name, tabprom)
+head(with.anno[!is.na(with.anno$PValue),])
 ```
 
 Note that this strategy is distinct from counting reads across promoters.
