@@ -1,14 +1,14 @@
 ---
 title: "Detecting differential binding of CBP in mouse fibroblasts"
 author:
-  - name: Aaron T. L. Lun
-    affiliation: 
-    - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
-    - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
-  - name: Gordon K. Smyth
-    affiliation: 
-    - *WEHI
-    - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+- name: Aaron T. L. Lun
+  affiliation: 
+  - &WEHI The Walter and Eliza Hall Institute of Medical Research, 1G Royal Parade, Parkville, VIC 3052, Melbourne, Australia
+  - Department of Medical Biology, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
+- name: Gordon K. Smyth
+  affiliation: 
+  - *WEHI
+  - Department of Mathematics and Statistics, The University of Melbourne, Parkville, VIC 3010, Melbourne, Australia
 date: "`r Sys.Date()`"
 vignette: >
   %\VignetteIndexEntry{3. Differential binding of CBP in fibroblasts}
@@ -16,21 +16,22 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 output:
   BiocStyle::html_document:
-    fig_caption: yes
     toc_float: yes
+    titlecaps: false
 bibliography: ref.bib
 ---
 
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
-opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
-opts_chunk$set(fig.asp=1)
+opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE, cache=TRUE)
 ```
 
 # Overview
 
 Here, we perform a window-based DB analysis to identify differentially bound (DB) regions for CREB-binding protein (CBP).
+This provides an example of how to use `r Biocpkg("csaw")` for transcription factor (TF) data, 
+complementing our `r Biocpkg("chipseqDB", "h3k9ac.html", "previous analysis")` on a histone mark.
 We use CBP ChIP-seq data from a study comparing wild-type (WT) and CBP knock-out (KO) animals [@kasper2014genomewide], with two biological replicates for each genotype.
 BAM files and indices are downloaded using `r Biocpkg("chipseqDBData")` and cached for later use.
 
@@ -39,9 +40,6 @@ library(chipseqDBData)
 cbpdata <- CBPData()
 cbpdata
 ```
-
-Most if not all of the DB sites should exhibit increased binding in the WT condition, given that protein function should be compromised in the KO cells.
-This provides an example of how to use the workflow with transcription factor (TF) data, to complement the previous H3K9ac analysis.
 
 # Pre-processing checks
 
@@ -97,7 +95,7 @@ frag.len <- maximizeCcf(x)
 frag.len
 ```
 
-```{r ccfplot, fig.cap="Cross-correlation function (CCF) against delay distance for the CBP data set. The delay with the maximum correlation is shown as the red line."}
+```{r ccfplot, fig.cap="Cross-correlation function (CCF) against delay distance for the CBP dataset. The delay with the maximum correlation is shown as the red line."}
 plot(1:length(x)-1, x, xlab="Delay (bp)", ylab="CCF", type="l")
 abline(v=frag.len, col="red")
 text(x=frag.len, y=min(x), paste(frag.len, "bp"), pos=4, col="red")
@@ -125,6 +123,8 @@ This is because reads are extended to the value of `frag.len`, which is substant
 Composition biases are introduced when the amount of DB in each condition is unbalanced [@robinson2010scaling; @lun2014denovo].
 More binding in one condition means that more reads are sequenced at the binding sites, leaving fewer reads for the rest of the genome.
 This suppresses the genomic coverage at non-DB sites, resulting in spurious differences between samples. 
+We expect unbalanced DB in this dataset as CBP function should be compromised in the KO cells,
+such that most - if not all - of the DB sites should exhibit increased CBP binding in the WT condition.
 
 To remove this bias, we assign reads to large genomic bins and assume that most bins represent non-DB background regions.
 Any systematic differences in the coverage of those bins is attributed to composition bias and is normalized out.
@@ -142,7 +142,7 @@ The dense cloud in each plot represents the majority of bins in the genome.
 These are assumed to mostly contain background regions.
 A non-zero log-fold change for these bins indicates that composition bias is present between samples. 
 The red line represents the log-ratio of normalization factors and passes through the centre of the cloud in each plot,
-    indicating that the bias has been successfully identified and removed.
+indicating that the bias has been successfully identified and removed.
 
 ```{r compoplot, fig.width=12, fig.asp=0.5, fig.cap="Mean-difference plots for the bin counts, comparing sample 4 to all other samples. The red line represents the log-ratio of the normalization factors between samples."}
 bin.ab <- scaledAverage(bins)
@@ -164,12 +164,12 @@ abline(h=log2(normfacs[3]/normfacs[4]), col="red")
 
 Note that this normalization strategy is quite different from that in the H3K9ac analysis.
 Here, systematic DB in one direction is expected between conditions, given that CBP function is lost in the KO genotype.
-This means that the assumption of a non-DB majority (required for non-linear normalization of the H3K9ac data) is not valid.
+This means that the assumption of a non-DB majority (required for non-linear normalization of the `r Biocpkg("chipseqDB", "h3k9ac.html#normalizing-for-sample-specific-trended-biases", "H3K9ac data")`) is not valid.
 No such assumption is made by the binned-TMM approach described above, which makes it more appropriate for use in the CBP analysis.
 
 # Filtering of low-abundance windows
 
-Removal of low-abundance windows is performed as previously described.
+Removal of low-abundance windows is performed as `r Biocpkg("chipseqDB", "h3k9ac.html#filtering-windows-by-abundance", "previously described")`, by computing the coverage in each window relative to a global estimate of background enrichment.
 The majority of windows in background regions are filtered out upon applying a modest fold-change threshold.
 This leaves a small set of relevant windows for further analysis.
 
@@ -182,13 +182,13 @@ filtered.data <- win.data[keep,]
 ```
 
 Note that the 10 kbp bins are used here for filtering, while smaller 2 kbp bins were used in the corresponding step for the H3K9ac analysis.
-This is purely for convenience -- the 10 kbp counts for this data set were previously loaded for normalization, and can be re-used during filtering to save time.
+This is purely for convenience -- the 10 kbp counts for this dataset were previously loaded for normalization, and can be re-used during filtering to save time.
 Changes in bin size will have little impact on the results, so long as the bins (and their counts) are large enough for precise estimation of the background abundance.
 While smaller bins provide greater spatial resolution, this is irrelevant for quantifying coverage in large background regions that span most of the genome.
 
 # Statistical modelling of biological variability
 
-Counts for each window are modelled using `r Biocpkg("edgeR")` as previously described [@mccarthy2012differential; @robinson2010edger].
+Counts for each window are modelled using `r Biocpkg("edgeR")` [@mccarthy2012differential; @robinson2010edger].
 We convert our `RangedSummarizedExperiment` object into a `DGEList`.
 
 ```{r}
@@ -212,9 +212,10 @@ design
 ```
 
 We estimate the negative binomial (NB) and quasi-likelihood (QL) dispersions for each window [@lund2012ql].
-The estimated NB dispersions (Figure \@ref(fig:bcvplot)) are substantially larger than those observed in the H3K9ac data set.
+The estimated NB dispersions (Figure \@ref(fig:bcvplot)) are substantially larger than those observed in the H3K9ac dataset.
+They also exhibit an unusual increasing trend with respect to abundance.
 
-```{r bcvplot, fig.cap="Abundance-dependent trend in the BCV for each window, represented by the blue line. Common (red) and tagwise estimates (black) are also shown."}
+```{r bcvplot, fig.cap="Abundance-dependent trend in the biological coefficient of variation (i.e., the root-NB dispersion) for each window, represented by the blue line. Common (red) and tagwise estimates (black) are also shown."}
 y <- estimateDisp(y, design)
 summary(y$trended.dispersion)
 plotBCV(y)
@@ -222,17 +223,20 @@ plotBCV(y)
 
 The estimated prior d.f. is also infinite, meaning that all the QL dispersions are equal to the trend (Figure \@ref(fig:qlplot)).
 
-```{r qlplot, fig.cap="Effect of EB shrinkage on the raw QL dispersion estimate for each window (black) towards the abundance-dependent trend (blue) to obtain squeezed estimates (red)."}
+```{r qlplot, fig.cap="Effect of EB shrinkage on the raw QL dispersion estimate for each window (black) towards the abundance-dependent trend (blue) to obtain squeezed estimates (red). Quarter-root estimates are shown for greater dynamic range."}
 fit <- glmQLFit(y, design, robust=TRUE)
 summary(fit$df.prior)
 plotQLDisp(fit)
 ```
 
-These statistics are consistent with the presence of systematic differences in CBP enrichment between replicates.
-The dispersions for all windows are inflated to a similarly large value by the batch effect, resulting in low variability in the dispersions across windows.
-This is illustrated in Figure \@ref(fig:mdsplot) where the WT samples are clearly separated in both dimensions of the MDS plot.
+These results are consistent with the presence of a systematic difference in CBP enrichment between the WT replicates.
+An increasing trend in Figure \@ref(fig:bcvplot) is typical after normalization for composition biases,
+where replicates exhibit some differences in efficiency that manifest as increased dispersions at high abundance.
+The dispersions for all windows are inflated to a similarly large value by this difference, 
+manifesting as low variability in the dispersions across windows.
+This effect is illustrated in Figure \@ref(fig:mdsplot) where the WT samples are clearly separated in both dimensions.
 
-```{r mdsplot, fig.cap="MDS plot with two dimensions for all samples in the CBP data set. Samples are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT samples."}
+```{r mdsplot, fig.cap="MDS plot with two dimensions for all samples in the CBP dataset. Samples are labelled and coloured according to the genotype. A larger top set of windows was used to improve the visualization of the genome-wide differences between the WT samples."}
 plotMDS(cpm(y, log=TRUE), top=10000, labels=genotype,
     col=c("red", "blue")[as.integer(genotype)])
 ```
@@ -243,12 +247,16 @@ given that there are strong differences between genotypes in Figure \@ref(fig:md
 
 # Testing for DB
 
-DB windows are identified using the QL F-test.
-Windows are clustered into regions and the region-level FDR is controlled using Simes' method [@simes1986; @lun2014denovo].
+We test for a significant difference in binding between genotypes in each window using the QL F-test.
 
 ```{r}
 contrast <- makeContrasts(wt-ko, levels=design)
 res <- glmQLFTest(fit, contrast=contrast)
+```
+
+Windows are clustered into regions and the region-level FDR is controlled using Simes' method [@simes1986; @lun2014denovo].
+
+```{r}
 merged <- mergeWindows(rowRanges(filtered.data), tol=100, max.width=5000)
 tabcom <- combineTests(merged$id, res$table)
 is.sig <- tabcom$FDR <= 0.05
@@ -267,8 +275,7 @@ is.sig.pos <- (tabbest$logFC > 0)[is.sig]
 summary(is.sig.pos)
 ```
 
-These results are saved to file, as previously described.
-Key objects are also saved for convenience.
+These results are saved to file in the form of a serialized R object for later inspection.
 
 ```{r}
 out.ranges <- merged$region
@@ -276,12 +283,12 @@ mcols(out.ranges) <- data.frame(tabcom,
     best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
     best.logFC=tabbest$logFC)
 saveRDS(file="cbp_results.rds", out.ranges)
-save(file="cbp_objects.Rda", win.data, bins)
 ```
 
 # Annotation and visualization
 
-Annotation for each region is added using the `detailRanges` function, as previously described.
+Annotation for each region is added using the `detailRanges()` function,
+as `r Biocpkg("chipseqDB", "h3k9ac.html#using-the-detailranges-function", "previously described")`.
 
 ```{r}
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
@@ -291,9 +298,10 @@ anno <- detailRanges(out.ranges, orgdb=org.Mm.eg.db,
 mcols(out.ranges) <- cbind(mcols(out.ranges), anno)
 ```
 
-One of the top-ranked DB regions will be visualized here.
+We will visualize one of the top-ranked DB regions here.
 This corresponds to a simple DB event as all windows are changing in the same direction, i.e., up in the WT.
-The binding region is also quite small relative to some of the H3K9ac examples, consistent with sharp TF binding to a specific recognition site.
+The binding region is also quite small relative to some of the H3K9ac examples, 
+consistent with sharp TF binding to a specific recognition site.
 
 ```{r}
 o <- order(out.ranges$PValue)    
@@ -308,7 +316,8 @@ if (!overlapsAny(cur.region, GRanges("chr16", IRanges(70313851, 70314860)), type
 ```
 
 We use `r Biocpkg("Gviz")` [@hahne2016visualizing] to plot the results.
-As in the H3K9ac analysis, we set up some tracks to display genome coordinates and gene annotation.
+As in the `r Biocpkg("chipseqDB", "h3k9ac.html#visualizing-db-results", "H3K9ac analysis")`, 
+we set up some tracks to display genome coordinates and gene annotation.
 
 ```{r}
 library(Gviz)
@@ -326,7 +335,6 @@ In Figure \@ref(fig:tfplot), two adjacent sites are present at the *Gbe1* promot
 Coverage is also substantially different between the WT replicates, consistent with the presence of a batch effect.
 
 ```{r tfplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for TF binding sites that are differentially bound in the WT (top two tracks) against the KO (last two tracks). Blue and red tracks represent forward- and reverse-strand coverage, respectively, on a per-million scale (capped at 5 in SRR1145788, for visibility)."}
-library(Gviz)
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 
@@ -342,9 +350,6 @@ for (i in seq_along(cbpdata$Path)) {
     collected[[i]] <- OverlayTrack(trackList=list(ptrack, ntrack))
 }
 
-gax <- GenomeAxisTrack(col="black", fontsize=15, size=2)
-greg <- GeneRegionTrack(TxDb.Mmusculus.UCSC.mm10.knownGene, showId=TRUE,
-    geneSymbol=TRUE, name="", background.title="transparent")
 plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)),
     from=start(cur.region), to=end(cur.region))
 ```
