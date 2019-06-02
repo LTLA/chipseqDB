@@ -432,8 +432,9 @@ while larger values provide a broader perspective, e.g., by considering adjacent
 Chaining effects are mitigated by setting a maximum cluster width of 5 kbp.
 
 ```{r}
-merged <- mergeWindows(rowRanges(filtered.data), tol=100, max.width=5000)
-merged$region
+merged <- mergeResults(filtered.data, res$table, tol=100, 
+    merge.args=list(max.width=5000))
+merged$regions
 ```
 
 A combined $p$-value is computed for each cluster using the method of @simes1986, 
@@ -443,19 +444,20 @@ Rejection of this global null indicates that the cluster (and the region that it
 Applying the BH method to the combined $p$-values allows the region-level FDR to be controlled.
 
 ```{r}
-tabcom <- combineTests(merged$id, res$table)
-head(tabcom)
+tabcom <- merged$combined
+tabcom
 ```
 
-Each row of the output table contains the statistics for a single cluster, 
+Each row of the above table contains the statistics for a single cluster, 
 including the combined *p*-value before and after the BH correction.
 Additional fields include `nWindows`, the total number of windows in the cluster; 
 `logFC.up`, the number of windows with a DB log-fold change above 0.5; 
-and `log.FC.down`, the number fof windows with a log-fold change below -0.5.
+and `log.FC.down`, the number of windows with a log-fold change below -0.5.
 
 ## Examining the scope and direction of DB
 
-We can easily calculate the total number of DB regions at a FDR of 5%.
+We determine the total number of DB regions at a FDR of 5% 
+by applying the Benjamini-Hochberg method on the combined $p$-values.
 
 ```{r}
 is.sig <- tabcom$FDR <= 0.05
@@ -463,7 +465,8 @@ summary(is.sig)
 ```
 
 Determining the direction of DB is more complicated, as clusters may contain windows that are changing in opposite directions.
-One approach is to use the direction of DB from the windows that contribute most to the combined $p$-value, as reported in the `direction` field for each cluster.
+One approach is to use the direction of DB from the windows that contribute most to the combined $p$-value, 
+as reported in the `direction` field for each cluster.
 If significance is driven by windows changing in both directions, the direction for the cluster is defined as `"mixed"`.
 Otherwise, the reported direction is the same as that of the windows, i.e., `"up"` or `"down"`.
 
@@ -471,18 +474,16 @@ Otherwise, the reported direction is the same as that of the windows, i.e., `"up
 table(tabcom$direction[is.sig])
 ```
 
-Another approach is to use the log-fold change of the most significant window (identified with the `getBestTest()` function) as a proxy for the log-fold change of the cluster.
+Another approach is to use the log-fold change of the most significant window as a proxy for the log-fold change of the cluster.
 
 ```{r}
-tabbest <- getBestTest(merged$id, res$table)
-head(tabbest)
+tabbest <- merged$best
+tabbest
 ```
 
-In the above table, each row contains the statistics for each cluster.
-Of interest are the `best` and `logFC` fields.
-The former is the index of the window that is the most significant in each cluster, 
-while the latter is the log-fold change of that window.
-This is used to obtain a summary of the direction of DB across all clusters.
+In the table above, the `best` column is the index of the window that is the most significant in each cluster, 
+while the `logFC` field is the log-fold change of that window.
+We use this to obtain a summary of the direction of DB across all clusters.
 
 ```{r}
 is.sig.pos <- (tabbest$logFC > 0)[is.sig]
@@ -501,8 +502,8 @@ We also store the midpoint and log-fold change of the most significant window in
 The updated `GRanges` object is then saved to file as a serialized R object with the `saveRDS` function.
 
 ```{r}
-out.ranges <- merged$region
-mcols(out.ranges) <- data.frame(tabcom,
+out.ranges <- merged$regions
+mcols(out.ranges) <- DataFrame(tabcom,
     best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
     best.logFC=tabbest$logFC)
 saveRDS(file="h3k9ac_results.rds", out.ranges)
@@ -591,15 +592,15 @@ head(prom)
 ```
 
 All windows overlapping each promoter are defined as a cluster.
-DB statistics are computed for each cluster/promoter with the `combineOverlaps()` function, which behaves like the `combineTests()` function for `Hits` input objects.
-This directly yields DB results for the annotated features.
+We compute DB statistics are computed for each cluster/promoter using Simes' method, 
+which directly yields DB results for the annotated features.
 Promoters with no overlapping windows are assigned `NA` values for the various fields and are filtered out below for demonstration purposes.
 
 ```{r}
-olap <- findOverlaps(prom, rowRanges(filtered.data))
-tabprom <- combineOverlaps(olap, res$table)
-with.anno <- data.frame(ID=prom$tx_name, Gene=prom$gene_name, tabprom)
-head(with.anno[!is.na(with.anno$PValue),])
+olap.out <- overlapResults(filtered.data, regions=prom, res$table)
+olap.out
+simple <- DataFrame(ID=prom$tx_name, Gene=prom$gene_name, olap.out$combined)
+simple[!is.na(simple$PValue),]
 ```
 
 Note that this strategy is distinct from counting reads across promoters.

@@ -274,24 +274,23 @@ fit2 <- glmQLFit(y2, design, robust=TRUE)
 res2 <- glmQLFTest(fit2, contrast=contrast)
 ```
 
-We consolidate the 500 bp analysis with our previous 2 kbp analysis using the `consolidateWindows()` function.
+We consolidate the 500 bp analysis with our previous 2 kbp analysis using the `mergeWindowsList()` function.
 This clusters both sets of windows together into a single set of regions.
+To limit chaining effects, each region cannot be more than 10 kbp in size.
 
 ```{r}
-combined <- consolidateWindows(list(filtered.data, filtered.data2), 
-    equiweight=TRUE, merge.args=list(tol=100))
-names(combined)
-combined$region
+merged <- mergeResultsList(list(filtered.data, filtered.data2), 
+    tab.list=list(res$table, res2$table),
+    equiweight=TRUE, tol=100, merge.args=list(max.width=10000))
+merged$regions
 ```
 
-We combine statistics across windows for each region using the `consolidateTests()` function.
-Specifically, we compute combined $p$-values using Simes' method for region-level FDR control [@simes1986; @lun2014denovo].
-This weights the contributions from the two sets of windows
+We compute combined $p$-values using Simes' method for region-level FDR control [@simes1986; @lun2014denovo].
+This is done after weighting the contributions from the two sets of windows
 to ensure that the combined $p$-value for each region is not dominated by the analysis with more (smaller) windows.
 
 ```{r}
-tabcom <- consolidateTests(combined$id, list(res$table, res2$table),
-    weight.list=combined$weight)
+tabcom <- merged$combined
 is.sig <- tabcom$FDR <= 0.05
 summary(is.sig)
 ```
@@ -310,16 +309,15 @@ We also obtain statistics for the window with the lowest $p$-value in each regio
 The signs of the log-fold changes are largely consistent with the `direction` numbers above.
 
 ```{r}
-tabbest <- consolidateTests(combined$id, list(res$table, res2$table),
-    weight.list=combined$weight, FUN=getBestTest)
+tabbest <- merged$best
 is.sig.pos <- (tabbest$logFC > 0)[is.sig]
 summary(is.sig.pos)
 ```
 
-Finally, these results are saved to file for future reference.
+Finally, we save these results to file for future reference.
 
 ```{r}
-out.ranges <- combined$region
+out.ranges <- merged$region
 mcols(out.ranges) <- data.frame(tabcom,
     best.logFC=tabbest$logFC)
 saveRDS(file="h3k27me3_results.rds", out.ranges)

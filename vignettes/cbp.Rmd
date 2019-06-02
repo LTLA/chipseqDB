@@ -254,11 +254,14 @@ contrast <- makeContrasts(wt-ko, levels=design)
 res <- glmQLFTest(fit, contrast=contrast)
 ```
 
-Windows are clustered into regions and the region-level FDR is controlled using Simes' method [@simes1986; @lun2014denovo].
+Windows less than 100 bp apart are clustered into regions [@lun2014denovo] with a maximum cluster width of 5 kbp.
+We then control the region-level FDR by combining per-window $p$-values using Simes' method [@simes1986].
 
 ```{r}
-merged <- mergeWindows(rowRanges(filtered.data), tol=100, max.width=5000)
-tabcom <- combineTests(merged$id, res$table)
+merged <- mergeResults(filtered.data, res$table, tol=100, 
+    merge.args=list(max.width=5000))
+merged$regions
+tabcom <- merged$combined
 is.sig <- tabcom$FDR <= 0.05
 summary(is.sig)
 ```
@@ -270,16 +273,16 @@ This is expected given that protein function should be lost in the KO genotype.
 table(tabcom$direction[is.sig])
 
 # Direction according the best window in each cluster.
-tabbest <- getBestTest(merged$id, res$table)
+tabbest <- merged$best
 is.sig.pos <- (tabbest$logFC > 0)[is.sig]
 summary(is.sig.pos)
 ```
 
-These results are saved to file in the form of a serialized R object for later inspection.
+We save the results to file in the form of a serialized R object for later inspection.
 
 ```{r}
-out.ranges <- merged$region
-mcols(out.ranges) <- data.frame(tabcom,
+out.ranges <- merged$regions
+mcols(out.ranges) <- DataFrame(tabcom,
     best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
     best.logFC=tabbest$logFC)
 saveRDS(file="cbp_results.rds", out.ranges)
