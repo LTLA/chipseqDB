@@ -276,12 +276,12 @@ res2 <- glmQLFTest(fit2, contrast=contrast)
 
 We consolidate the 500 bp analysis with our previous 2 kbp analysis using the `mergeWindowsList()` function.
 This clusters both sets of windows together into a single set of regions.
-To limit chaining effects, each region cannot be more than 10 kbp in size.
+To limit chaining effects, each region cannot be more than 30 kbp in size.
 
 ```{r}
 merged <- mergeResultsList(list(filtered.data, filtered.data2), 
     tab.list=list(res$table, res2$table),
-    equiweight=TRUE, tol=100, merge.args=list(max.width=10000))
+    equiweight=TRUE, tol=100, merge.args=list(max.width=30000))
 merged$regions
 ```
 
@@ -317,7 +317,7 @@ summary(is.sig.pos)
 Finally, we save these results to file for future reference.
 
 ```{r}
-out.ranges <- merged$region
+out.ranges <- merged$regions
 mcols(out.ranges) <- data.frame(tabcom,
     best.logFC=tabbest$logFC)
 saveRDS(file="h3k27me3_results.rds", out.ranges)
