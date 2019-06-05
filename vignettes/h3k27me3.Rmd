@@ -65,7 +65,7 @@ diag.stats
 
 We construct a `readParam` object to standardize the parameter settings in this analysis.
 For consistency with the original analysis by @galvis2015repression,
-we will define the blacklist using the the predicted repeats from the RepeatMasker software.
+we will define the blacklist using the predicted repeats from the RepeatMasker software.
 
 ```{r}
 library(BiocFileCache)
@@ -158,7 +158,7 @@ abline(h=log2(normfacs[3]/normfacs[4]), col="red")
 
 We estimate the global background and remove low-abundance windows that are not enriched above this background level.
 To retain a window, we require it to have at least 2-fold more coverage than the average background.
-This is less stringent than the thresholds used in previous analyses, owing the the weaker enrichment observed for diffuse marks.
+This is less stringent than the thresholds used in previous analyses, owing the weaker enrichment observed for diffuse marks.
 
 ```{r}
 filter.stat <- filterWindows(win.data, bins, type="global")
@@ -297,9 +297,7 @@ summary(is.sig)
 
 Ezh2 is one of the proteins responsible for depositing H3K27me3, 
 so we might expect that most DB regions have increased enrichment in the WT condition.
-However, the opposite seems to be true here.
-The most obvious explanation is that loss of Ezh2 triggers downstream effects in the surrounding regulatory network,
-though it is also possible that Ezh2 itself has a role in this system beyond the deposition of H3K27me3.
+However, the opposite seems to be true here, which is an interesting result that may warrant further investigation. 
 
 ```{r}
 table(tabcom$direction[is.sig])
@@ -381,8 +379,9 @@ plotTracks(c(gax, collected, greg), chromosome=as.character(seqnames(cur.region)
     from=start(cur.region), to=end(cur.region))
 ```
 
-In contrast, we do not observe any DB regions overlapping the _Col1a2_ gene.
-No change in H3K27me3 enrichment is expected as this gene is constitutively expressed in both WT and KO lung epithelium.
+In contrast, if we look at a constitutively expressed gene, such as _Col1a2_, we find little evidence of H3K27me3 deposition.
+Only a single window is retained after filtering on abundance,
+and this window shows no evidence of changes in H3K27me3 enrichment between WT and KO samples.
 
 ```{r}
 col1a2 <- genes(TxDb.Mmusculus.UCSC.mm10.knownGene)["12843"] # Col1a2 Entrez ID
