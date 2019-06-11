@@ -236,7 +236,7 @@ This removes a large number of windows that are weakly or not marked and are lik
 
 ```{r}
 bins <- windowCounts(acdata$Path, bin=TRUE, width=2000, param=param)
-filter.stat <- filterWindows(win.data, bins, type="global")
+filter.stat <- filterWindowsGlobal(win.data, bins)
 min.fc <- 3
 keep <- filter.stat$filter > log2(min.fc)
 summary(keep)

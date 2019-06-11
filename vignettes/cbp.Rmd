@@ -174,7 +174,7 @@ The majority of windows in background regions are filtered out upon applying a m
 This leaves a small set of relevant windows for further analysis.
 
 ```{r}
-filter.stat <- filterWindows(win.data, bins, type="global")
+filter.stat <- filterWindowsGlobal(win.data, bins)
 min.fc <- 3
 keep <- filter.stat$filter > log2(min.fc)
 summary(keep)

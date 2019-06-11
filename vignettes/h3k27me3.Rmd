@@ -161,7 +161,7 @@ To retain a window, we require it to have at least 2-fold more coverage than the
 This is less stringent than the thresholds used in previous analyses, owing the weaker enrichment observed for diffuse marks.
 
 ```{r}
-filter.stat <- filterWindows(win.data, bins, type="global")
+filter.stat <- filterWindowsGlobal(win.data, bins)
 min.fc <- 2 
 ```
 
@@ -176,7 +176,7 @@ threshold <- filter.stat$abundances[1] - filter.stat$filter[1] + log2(min.fc)
 abline(v=threshold, col="red")
 ```
 
-The majority of windows in background regions are filtered out upon applying a modest fold-change threshold.
+We filter out the majority of windows in background regions upon applying a modest fold-change threshold.
 This leaves a small set of relevant windows for further analysis.
 
 ```{r}
