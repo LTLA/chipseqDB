@@ -263,7 +263,7 @@ win.data2 <- windowCounts(h3k27me3data$Path, param=param, width=500,
 win.data2$norm.factors <- win.data$norm.factors
 
 # Filtering on abundance.
-filter.stat2 <- filterWindows(win.data2, bins, type="global")
+filter.stat2 <- filterWindowsGlobal(win.data2, bins)
 keep2 <- filter.stat2$filter > log2(min.fc)
 filtered.data2 <- win.data2[keep2,]
 
