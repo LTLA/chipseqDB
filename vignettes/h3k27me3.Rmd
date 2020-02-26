@@ -308,7 +308,7 @@ The signs of the log-fold changes are largely consistent with the `direction` nu
 
 ```{r}
 tabbest <- merged$best
-is.sig.pos <- (tabbest$logFC > 0)[is.sig]
+is.sig.pos <- (tabbest$rep.logFC > 0)[is.sig]
 summary(is.sig.pos)
 ```
 
@@ -316,8 +316,7 @@ Finally, we save these results to file for future reference.
 
 ```{r}
 out.ranges <- merged$regions
-mcols(out.ranges) <- data.frame(tabcom,
-    best.logFC=tabbest$logFC)
+mcols(out.ranges) <- data.frame(tabcom, best.logFC=tabbest$rep.logFC)
 saveRDS(file="h3k27me3_results.rds", out.ranges)
 ```
 

@@ -450,9 +450,9 @@ tabcom
 
 Each row of the above table contains the statistics for a single cluster, 
 including the combined *p*-value before and after the BH correction.
-Additional fields include `nWindows`, the total number of windows in the cluster; 
-`logFC.up`, the number of windows with a DB log-fold change above 0.5; 
-and `log.FC.down`, the number of windows with a log-fold change below -0.5.
+Additional fields include `num.tests`, the total number of windows in the cluster; 
+`num.up.logFC`, the number of windows with a DB log-fold change significantly greater than zero;
+and `num.down.logFC`, the number of windows with a log-fold change significantly below zero.
 
 ## Examining the scope and direction of DB
 
@@ -486,7 +486,7 @@ while the `logFC` field is the log-fold change of that window.
 We use this to obtain a summary of the direction of DB across all clusters.
 
 ```{r}
-is.sig.pos <- (tabbest$logFC > 0)[is.sig]
+is.sig.pos <- (tabbest$rep.logFC > 0)[is.sig]
 summary(is.sig.pos)
 ```
 
@@ -504,8 +504,8 @@ The updated `GRanges` object is then saved to file as a serialized R object with
 ```{r}
 out.ranges <- merged$regions
 mcols(out.ranges) <- DataFrame(tabcom,
-    best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
-    best.logFC=tabbest$logFC)
+    best.pos=mid(ranges(rowRanges(filtered.data[tabbest$rep.test]))),
+    best.logFC=tabbest$rep.logFC)
 saveRDS(file="h3k9ac_results.rds", out.ranges)
 ```
 
@@ -681,7 +681,7 @@ These are identified as those clusters that contain windows changing in both dir
 Here, one of the top-ranking complex clusters is selected for visualization.
 
 ```{r}
-complex <- sorted.ranges$logFC.up > 0 & sorted.ranges$logFC.down > 0
+complex <- sorted.ranges$num.up.logFC > 0 & sorted.ranges$num.down.logFC > 0
 cur.region <- sorted.ranges[complex][2]
 cur.region
 ```
@@ -718,7 +718,7 @@ However, H3K9ac marking can also be concentrated into small regions, involving o
 This is demonstrated by examining those clusters that contain a smaller number of windows.
 
 ```{r}
-sharp <- sorted.ranges$nWindows < 20
+sharp <- sorted.ranges$num.tests < 20
 cur.region <- sorted.ranges[sharp][1]
 cur.region
 ```

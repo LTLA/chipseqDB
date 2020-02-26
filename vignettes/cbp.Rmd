@@ -274,7 +274,7 @@ table(tabcom$direction[is.sig])
 
 # Direction according the best window in each cluster.
 tabbest <- merged$best
-is.sig.pos <- (tabbest$logFC > 0)[is.sig]
+is.sig.pos <- (tabbest$rep.logFC > 0)[is.sig]
 summary(is.sig.pos)
 ```
 
@@ -283,8 +283,8 @@ We save the results to file in the form of a serialized R object for later inspe
 ```{r}
 out.ranges <- merged$regions
 mcols(out.ranges) <- DataFrame(tabcom,
-    best.pos=mid(ranges(rowRanges(filtered.data[tabbest$best]))),
-    best.logFC=tabbest$logFC)
+    best.pos=mid(ranges(rowRanges(filtered.data[tabbest$rep.test]))),
+    best.logFC=tabbest$rep.logFC)
 saveRDS(file="cbp_results.rds", out.ranges)
 ```
 
