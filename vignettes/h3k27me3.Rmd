@@ -367,7 +367,7 @@ This is consistent with the known regulatory relationship between Ezh2 and _Cdx2
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 for (i in seq_along(h3k27me3data$Path)) {
-    reads <- extractReads(bam.file=h3k27me3data$Path[i], cur.region, param=param)
+    reads <- extractReads(bam.file=h3k27me3data$Path[[i]], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
     collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,1),
         name=h3k27me3data$Description[i], col.axis="black", col.title="black",

@@ -342,7 +342,7 @@ collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 
 for (i in seq_along(cbpdata$Path)) {
-    reads <- extractReads(bam.file=cbpdata$Path[i], cur.region, param=param)
+    reads <- extractReads(bam.file=cbpdata$Path[[i]], cur.region, param=param)
     pcov <- as(coverage(reads[strand(reads)=="+"])/lib.sizes[i], "GRanges")
     ncov <- as(coverage(reads[strand(reads)=="-"])/-lib.sizes[i], "GRanges")
     ptrack <- DataTrack(pcov, type="histogram", lwd=0, ylim=c(-5, 5),

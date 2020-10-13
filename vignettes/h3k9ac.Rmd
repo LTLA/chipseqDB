@@ -664,7 +664,7 @@ This corrects for differences in library sizes between tracks.
 collected <- list()
 lib.sizes <- filtered.data$totals/1e6
 for (i in seq_along(acdata$Path)) {
-    reads <- extractReads(bam.file=acdata$Path[i], cur.region, param=param)
+    reads <- extractReads(bam.file=acdata$Path[[i]], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
     collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,10),
         name=acdata$Description[i], col.axis="black", col.title="black",
@@ -699,7 +699,7 @@ This represents a complex DB event that would not be detected if reads were coun
 ```{r complexplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a complex DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
 for (i in seq_along(acdata$Path)) {
-    reads <- extractReads(bam.file=acdata$Path[i], cur.region, param=param)
+    reads <- extractReads(bam.file=acdata$Path[[i]], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
     collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3),
         name=acdata$Description[i], col.axis="black", col.title="black",
@@ -736,7 +736,7 @@ Again, this makes biological sense as CD86 is involved in regulating immunoglobu
 ```{r simplesharpplot, fig.width=8, fig.asp=0.75, fig.cap="Coverage tracks for a sharp and simple DB event in the H3K9ac data set, shown as per-million values."}
 collected <- list()
 for (i in seq_along(acdata$Path)) {
-    reads <- extractReads(bam.file=acdata$Path[i], cur.region, param=param)
+    reads <- extractReads(bam.file=acdata$Path[[i]], cur.region, param=param)
     cov <- as(coverage(reads)/lib.sizes[i], "GRanges")
     collected[[i]] <- DataTrack(cov, type="histogram", lwd=0, ylim=c(0,3),
         name=acdata$Description[i], col.axis="black", col.title="black",
