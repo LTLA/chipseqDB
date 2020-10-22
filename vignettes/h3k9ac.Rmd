@@ -51,15 +51,18 @@ while the proportion of marked reads should be low (generally below 20%).
 ```{r mapstat}
 library(Rsamtools)
 diagnostics <- list()
-for (bam in acdata$Path) {
+for (b in seq_along(acdata$Path)) {
+    bam <- acdata$Path[[b]]
     total <- countBam(bam)$records
     mapped <- countBam(bam, param=ScanBamParam(
         flag=scanBamFlag(isUnmapped=FALSE)))$records
     marked <- countBam(bam, param=ScanBamParam(
         flag=scanBamFlag(isUnmapped=FALSE, isDuplicate=TRUE)))$records
-    diagnostics[[basename(bam)]] <- c(Total=total, Mapped=mapped, Marked=marked)
+    diagnostics[[b]] <- c(Total=total, Mapped=mapped, Marked=marked)
 }
+
 diag.stats <- data.frame(do.call(rbind, diagnostics))
+rownames(diag.stats) <- acdata$Name
 diag.stats$Prop.mapped <- diag.stats$Mapped/diag.stats$Total*100
 diag.stats$Prop.marked <- diag.stats$Marked/diag.stats$Mapped*100
 diag.stats

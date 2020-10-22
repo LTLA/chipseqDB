@@ -49,15 +49,18 @@ We check some mapping statistics with `r Biocpkg("Rsamtools")`.
 ```{r}
 library(Rsamtools)
 diagnostics <- list()
-for (bam in h3k27me3data$Path) {
+for (b in seq_along(h3k27me3data$Path)) {
+    bam <- h3k27me3data$Path[[b]]
     total <- countBam(bam)$records
     mapped <- countBam(bam, param=ScanBamParam(
         flag=scanBamFlag(isUnmapped=FALSE)))$records
     marked <- countBam(bam, param=ScanBamParam(
         flag=scanBamFlag(isUnmapped=FALSE, isDuplicate=TRUE)))$records
-    diagnostics[[basename(bam)]] <- c(Total=total, Mapped=mapped, Marked=marked)
+    diagnostics[[b]] <- c(Total=total, Mapped=mapped, Marked=marked)
 }
+
 diag.stats <- data.frame(do.call(rbind, diagnostics))
+rownames(diag.stats) <- h3k27me3data$Name
 diag.stats$Prop.mapped <- diag.stats$Mapped/diag.stats$Total*100
 diag.stats$Prop.marked <- diag.stats$Marked/diag.stats$Mapped*100
 diag.stats
